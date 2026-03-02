@@ -1,0 +1,813 @@
+import React, { useState, useEffect } from 'react';
+import { transactionsAPI, reportsAPI, dashboardAPI } from '../utils/api';
+import { formatCurrency } from '../utils/helpers';
+import { 
+  FileText, 
+  Calendar, 
+  TrendingUp, 
+  Download,
+  Filter,
+  Search,
+  Eye,
+  ShoppingBag,
+  CreditCard,
+  FileDown
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import TransactionDetailModal from '../components/TransactionDetailModal';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+const ReportsPage = () => {
+  const [transactions, setTransactions] = useState([]);
+  const [dailyReport, setDailyReport] = useState(null);
+  const [monthlyReport, setMonthlyReport] = useState(null);
+  const [salesTrend, setSalesTrend] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [comparison, setComparison] = useState(null);
+  const [comparisonType, setComparisonType] = useState('monthly');
+  const [peakHours, setPeakHours] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('transactions');
+  const [dateFilter, setDateFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cashierFilter, setCashierFilter] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('');
+  const [selectedTransactionId, setSelectedTransactionId] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [cashiers, setCashiers] = useState([]);
+
+  useEffect(() => {
+    fetchData();
+    
+    // Auto refresh every 30 seconds for today's data
+    const interval = setInterval(() => {
+      const today = new Date().toISOString().split('T')[0];
+      fetchDailyReport(today);
+      fetchPeakHours(today);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      const month = today.getMonth() + 1;
+      const year = today.getFullYear();
+
+      const [transactionsRes, dailyRes, monthlyRes, trendRes, topProductsRes] = await Promise.all([
+        transactionsAPI.getAll(),
+        transactionsAPI.getDailyReport(dateStr),
+        transactionsAPI.getMonthlyReport(`${year}-${month.toString().padStart(2, '0')}`),
+        dashboardAPI.getSalesTrend(30),
+        dashboardAPI.getTopProducts(5)
+      ]);
+
+      const txData = transactionsRes.data.data.transactions || [];
+      setTransactions(txData);
+      setDailyReport(dailyRes.data.data);
+      setMonthlyReport(monthlyRes.data.data.report);
+      
+      // Fetch comparison
+      fetchComparison('monthly');
+      
+      // Fetch peak hours
+      fetchPeakHours(dateStr);
+      
+      // Extract unique cashiers
+      const uniqueCashiers = [...new Set(txData.map(tx => tx.cashier_name).filter(Boolean))];
+      setCashiers(uniqueCashiers);
+      
+      // Process sales trend
+      const trend = trendRes.data.data || [];
+      setSalesTrend(trend.map(item => ({
+        date: new Date(item.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        penjualan: item.total_sales,
+        profit: item.total_profit
+      })));
+
+      // Process top products
+      const products = topProductsRes.data.data || [];
+      setTopProducts(products.map(item => ({
+        name: item.product_name,
+        qty: item.total_qty,
+        revenue: item.total_revenue
+      })));
+
+      // Process payment methods
+      const paymentStats = {};
+      txData.forEach(tx => {
+        const method = tx.payment_method || 'Cash';
+        paymentStats[method] = (paymentStats[method] || 0) + 1;
+      });
+      setPaymentMethods(Object.entries(paymentStats).map(([name, value]) => ({ name, value })));
+
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      toast.error('Gagal memuat data laporan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportDaily = async () => {
+    setExporting(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await reportsAPI.exportDaily(today);
+      
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-harian-${today}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Laporan harian berhasil diexport!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Gagal export laporan');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportMonthly = async () => {
+    setExporting(true);
+    try {
+      const today = new Date();
+      const month = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+      const response = await reportsAPI.exportMonthly(month);
+      
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-bulanan-${month}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Laporan bulanan berhasil diexport!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Gagal export laporan');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setExporting(true);
+    try {
+      const doc = new jsPDF();
+      const today = new Date().toLocaleDateString('id-ID');
+      
+      // Header
+      doc.setFontSize(18);
+      doc.text('LAPORAN PENJUALAN', 105, 15, { align: 'center' });
+      doc.setFontSize(11);
+      doc.text('POS UMKM', 105, 22, { align: 'center' });
+      doc.text(`Tanggal: ${today}`, 105, 28, { align: 'center' });
+      
+      // Summary
+      if (monthlyReport) {
+        doc.setFontSize(12);
+        doc.text('Ringkasan Bulanan', 14, 40);
+        doc.setFontSize(10);
+        doc.text(`Total Transaksi: ${monthlyReport.transaction_count}`, 14, 48);
+        doc.text(`Total Penjualan: ${formatCurrency(monthlyReport.total_sales)}`, 14, 54);
+        doc.text(`Total Profit: ${formatCurrency(monthlyReport.total_profit)}`, 14, 60);
+        doc.text(`Rata-rata Transaksi: ${formatCurrency(monthlyReport.avg_transaction)}`, 14, 66);
+      }
+      
+      // Comparison
+      if (comparison) {
+        doc.setFontSize(12);
+        doc.text('Perbandingan Periode', 14, 78);
+        doc.setFontSize(10);
+        doc.text(`Perubahan: ${comparison.percent_change.toFixed(1)}% (${comparison.trend})`, 14, 86);
+      }
+      
+      // Transactions Table
+      doc.setFontSize(12);
+      doc.text('Daftar Transaksi', 14, 98);
+      
+      const tableData = filteredTransactions.slice(0, 50).map(tx => [
+        `#${tx.id}`,
+        new Date(tx.created_at).toLocaleDateString('id-ID'),
+        tx.cashier_name || 'System',
+        formatCurrency(tx.total_amount),
+        tx.payment_method
+      ]);
+      
+      doc.autoTable({
+        startY: 102,
+        head: [['ID', 'Tanggal', 'Kasir', 'Total', 'Pembayaran']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 8 }
+      });
+      
+      // Top Products
+      if (topProducts.length > 0) {
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(12);
+        doc.text('Top 5 Produk Terlaris', 14, finalY);
+        
+        const productData = topProducts.map(p => [
+          p.name,
+          p.qty.toString(),
+          formatCurrency(p.revenue)
+        ]);
+        
+        doc.autoTable({
+          startY: finalY + 4,
+          head: [['Produk', 'Qty', 'Revenue']],
+          body: productData,
+          theme: 'grid',
+          headStyles: { fillColor: [16, 185, 129] },
+          styles: { fontSize: 8 }
+        });
+      }
+      
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Halaman ${i} dari ${pageCount}`, 105, 290, { align: 'center' });
+      }
+      
+      doc.save(`laporan-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Laporan PDF berhasil diexport!');
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      toast.error('Gagal export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const fetchDailyReport = async (date) => {
+    try {
+      const response = await transactionsAPI.getDailyReport(date);
+      setDailyReport(response.data.data);
+    } catch (error) {
+      toast.error('Gagal memuat laporan harian');
+    }
+  };
+
+  const fetchMonthlyReport = async (month) => {
+    try {
+      const response = await transactionsAPI.getMonthlyReport(month);
+      setMonthlyReport(response.data.data.report);
+    } catch (error) {
+      toast.error('Gagal memuat laporan bulanan');
+    }
+  };
+
+  const fetchComparison = async (type) => {
+    try {
+      const response = await transactionsAPI.comparePeriod(type);
+      setComparison(response.data.data);
+    } catch (error) {
+      console.error('Error fetching comparison:', error);
+    }
+  };
+
+  const fetchPeakHours = async (date) => {
+    try {
+      const response = await transactionsAPI.getPeakHours(date);
+      const hours = response.data.data || [];
+      setPeakHours(hours.map(h => ({
+        jam: `${h.hour}:00`,
+        transaksi: h.count,
+        penjualan: h.sales
+      })));
+    } catch (error) {
+      console.error('Error fetching peak hours:', error);
+    }
+  };
+
+  const setQuickFilter = (days) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.id.toString().includes(searchTerm) ||
+                         transaction.cashier_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const txDate = new Date(transaction.created_at).toISOString().split('T')[0];
+    const matchesDateRange = (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
+    const matchesDateFilter = !dateFilter || transaction.created_at.startsWith(dateFilter);
+    const matchesCashier = !cashierFilter || transaction.cashier_name === cashierFilter;
+    const matchesPayment = !paymentFilter || transaction.payment_method === paymentFilter;
+    return matchesSearch && (matchesDateRange || matchesDateFilter) && matchesCashier && matchesPayment;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Laporan</h1>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="btn bg-red-600 text-white hover:bg-red-700 flex items-center space-x-2 disabled:opacity-50"
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <FileDown className="w-4 h-4" />
+            )}
+            <span>Export PDF</span>
+          </button>
+          <button 
+            onClick={handleExportDaily}
+            disabled={exporting}
+            className="btn btn-primary flex items-center space-x-2 disabled:opacity-50"
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>Export CSV Harian</span>
+          </button>
+          <button 
+            onClick={handleExportMonthly}
+            disabled={exporting}
+            className="btn bg-green-600 text-white hover:bg-green-700 flex items-center space-x-2 disabled:opacity-50"
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>Export CSV Bulanan</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <nav className="-mb-px flex space-x-8">
+          {[
+            { id: 'overview', name: 'Overview', icon: TrendingUp },
+            { id: 'transactions', name: 'Transaksi', icon: FileText },
+            { id: 'daily', name: 'Laporan Harian', icon: Calendar },
+            { id: 'monthly', name: 'Laporan Bulanan', icon: TrendingUp }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === tab.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span>{tab.name}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Period Comparison */}
+          {comparison && (
+            <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Perbandingan Periode</h3>
+                <select
+                  value={comparisonType}
+                  onChange={(e) => {
+                    setComparisonType(e.target.value);
+                    fetchComparison(e.target.value);
+                  }}
+                  className="input w-auto"
+                >
+                  <option value="daily">Harian</option>
+                  <option value="weekly">Mingguan</option>
+                  <option value="monthly">Bulanan</option>
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Periode Sekarang</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {formatCurrency(comparison.current_period.total_sales)}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {comparison.current_period.transaction_count} transaksi
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Periode Sebelumnya</p>
+                  <p className="text-3xl font-bold text-gray-500 dark:text-gray-400">
+                    {formatCurrency(comparison.previous_period.total_sales)}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {comparison.previous_period.transaction_count} transaksi
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Perubahan</p>
+                  <div className="flex items-center space-x-2">
+                    <p className={`text-3xl font-bold ${
+                      comparison.trend === 'up' ? 'text-green-600' : 
+                      comparison.trend === 'down' ? 'text-red-600' : 
+                      'text-gray-600'
+                    }`}>
+                      {comparison.percent_change > 0 ? '+' : ''}{comparison.percent_change.toFixed(1)}%
+                    </p>
+                    {comparison.trend === 'up' && <TrendingUp className="w-8 h-8 text-green-600" />}
+                    {comparison.trend === 'down' && <TrendingUp className="w-8 h-8 text-red-600 transform rotate-180" />}
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {comparison.trend === 'up' ? '🎉 Penjualan meningkat!' : 
+                     comparison.trend === 'down' ? '📉 Penjualan menurun' : 
+                     '➡️ Penjualan stabil'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Trend Penjualan */}
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Trend Penjualan 30 Hari Terakhir</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={salesTrend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Legend />
+                <Line type="monotone" dataKey="penjualan" stroke="#3b82f6" strokeWidth={2} name="Penjualan" />
+                <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} name="Profit" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Products */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
+                <ShoppingBag className="w-5 h-5 mr-2" />
+                Top 5 Produk Terlaris
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topProducts}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value, name) => name === 'revenue' ? formatCurrency(value) : value} />
+                  <Legend />
+                  <Bar dataKey="qty" fill="#3b82f6" name="Qty Terjual" />
+                  <Bar dataKey="revenue" fill="#10b981" name="Revenue" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                Metode Pembayaran
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={paymentMethods}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {paymentMethods.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Peak Hours */}
+          {peakHours.length > 0 && (
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                Jam Sibuk Hari Ini
+              </h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={peakHours}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="jam" />
+                  <YAxis />
+                  <Tooltip formatter={(value, name) => name === 'penjualan' ? formatCurrency(value) : value} />
+                  <Legend />
+                  <Bar dataKey="transaksi" fill="#f59e0b" name="Jumlah Transaksi" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Transactions Tab */}
+      {activeTab === 'transactions' && (
+        <div className="card">
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button onClick={() => setQuickFilter(0)} className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              Hari Ini
+            </button>
+            <button onClick={() => setQuickFilter(1)} className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              Kemarin
+            </button>
+            <button onClick={() => setQuickFilter(7)} className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              7 Hari Terakhir
+            </button>
+            <button onClick={() => setQuickFilter(30)} className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              30 Hari Terakhir
+            </button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); setDateFilter(''); }} className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+              Reset
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Cari transaksi..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input pl-10"
+              />
+            </div>
+            <input
+              type="date"
+              placeholder="Dari Tanggal"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="input"
+            />
+            <input
+              type="date"
+              placeholder="Sampai Tanggal"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="input"
+            />
+            <select
+              value={cashierFilter}
+              onChange={(e) => setCashierFilter(e.target.value)}
+              className="input"
+            >
+              <option value="">Semua Kasir</option>
+              {cashiers.map(cashier => (
+                <option key={cashier} value={cashier}>{cashier}</option>
+              ))}
+            </select>
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value)}
+              className="input"
+            >
+              <option value="">Semua Pembayaran</option>
+              <option value="Cash">Cash</option>
+              <option value="Debit">Debit</option>
+              <option value="Credit">Credit</option>
+              <option value="E-Wallet">E-Wallet</option>
+            </select>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Tanggal</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Kasir</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Total</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Pembayaran</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="py-3 px-4 font-mono text-sm">#{transaction.id}</td>
+                    <td className="py-3 px-4 text-gray-900 dark:text-gray-100">
+                      {new Date(transaction.created_at).toLocaleDateString('id-ID')}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900 dark:text-gray-100">
+                      {transaction.cashier_name || 'System'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900 dark:text-gray-100 font-medium">
+                      {formatCurrency(transaction.total_amount)}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        {transaction.payment_method}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <button 
+                        onClick={() => setSelectedTransactionId(transaction.id)}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                      >
+                        <Eye className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Report Tab */}
+      {activeTab === 'daily' && (
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <input
+              type="date"
+              value={dateFilter || new Date().toISOString().split('T')[0]}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                fetchDailyReport(e.target.value);
+              }}
+              className="input"
+            />
+          </div>
+
+          {dailyReport && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transaksi</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{dailyReport.transaction_count || 0}</p>
+                  </div>
+                  <FileText className="w-8 h-8 text-primary" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Penjualan</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(dailyReport.total_sales || 0)}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-green-500" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rata-rata per Transaksi</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency((dailyReport.total_sales || 0) / (dailyReport.transaction_count || 1))}
+                    </p>
+                  </div>
+                  <Calendar className="w-8 h-8 text-blue-500" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Profit</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(dailyReport.total_profit || 0)}</p>
+                  </div>
+                  <FileText className="w-8 h-8 text-orange-500" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Monthly Report Tab */}
+      {activeTab === 'monthly' && (
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <input
+              type="month"
+              value={dateFilter || new Date().toISOString().slice(0, 7)}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                fetchMonthlyReport(e.target.value);
+              }}
+              className="input"
+            />
+          </div>
+
+          {monthlyReport && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transaksi</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{monthlyReport.transaction_count || 0}</p>
+                  </div>
+                  <FileText className="w-8 h-8 text-primary" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Penjualan</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(monthlyReport.total_sales || 0)}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-green-500" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rata-rata Transaksi</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(monthlyReport.avg_transaction || 0)}
+                    </p>
+                  </div>
+                  <Calendar className="w-8 h-8 text-blue-500" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Profit</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(monthlyReport.total_profit || 0)}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-green-500" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Transaction Detail Modal */}
+      {selectedTransactionId && (
+        <TransactionDetailModal
+          transactionId={selectedTransactionId}
+          onClose={() => setSelectedTransactionId(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default ReportsPage;

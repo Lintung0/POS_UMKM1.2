@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200;
+  }
+  
+  /* Fix select dropdown in dark mode */
+  select option {
+    @apply bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100;
+  }
+  
+  /* Fix table borders in dark mode */
+  table {
+    @apply border-collapse;
+  }
+  
+  /* Fix modal backdrop */
+  .modal-backdrop {
+    @apply bg-black bg-opacity-50 dark:bg-black dark:bg-opacity-70;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-blue-700 focus:ring-primary shadow-sm;
+  }
+  
+  .btn-success {
+    @apply bg-success text-white hover:bg-green-700 focus:ring-success shadow-sm;
+  }
+  
+  .btn-danger {
+    @apply bg-danger text-white hover:bg-red-700 focus:ring-danger shadow-sm;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500 shadow-sm;
+  }
+  
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-200;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200;
+  }
+  
+  .table-header {
+    @apply text-left py-3 px-4 font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600;
+  }
+  
+  .table-row {
+    @apply border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150;
+  }
+  
+  .table-cell {
+    @apply py-3 px-4 text-gray-900 dark:text-gray-100;
+  }
+  
+  .badge {
+    @apply px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+  }
+  
+  .badge-danger {
+    @apply bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
+  }
+  
+  /* Loading spinner */
+  .spinner {
+    @apply animate-spin rounded-full border-b-2 border-primary;
+  }
+  
+  /* Icon buttons */
+  .icon-btn {
+    @apply p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-150;
+  }
+  
+  .icon-btn-sm {
+    @apply p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors duration-150;
+  }
+  
+  /* Modal */
+  .modal {
+    @apply fixed inset-0 bg-black bg-opacity-50 dark:bg-black dark:bg-opacity-70 flex items-center justify-center z-50;
+  }
+  
+  .modal-content {
+    @apply bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-gray-700;
+  }
+  
+  .modal-title {
+    @apply text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100;
+  }
+  
+  /* Form elements */
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+  }
+  
+  .form-group {
+    @apply space-y-1;
+  }
+  
+  /* Status indicators */
+  .status-online {
+    @apply w-2 h-2 bg-green-500 rounded-full;
+  }
+  
+  .status-offline {
+    @apply w-2 h-2 bg-red-500 rounded-full;
+  }
+  
+  /* Sidebar */
+  .sidebar-item {
+    @apply flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-150;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-primary text-white hover:bg-blue-700;
+  }
+}
+
+
+/* Print Styles */
+@media print {
+  /* Hide everything except receipt */
+  body * {
+    visibility: hidden;
+  }
+  
+  .receipt-content,
+  .receipt-content * {
+    visibility: visible;
+  }
+  
+  .receipt-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 10mm;
+  }
+  
+  /* Hide non-printable elements */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Receipt styling for print */
+  .receipt-content {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+  }
+  
+  /* Remove shadows and borders for print */
+  .receipt-content * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Ensure borders print */
+  .receipt-content .border-dashed {
+    border-style: dashed !important;
+    border-color: #000 !important;
+  }
+  
+  /* Page setup */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
