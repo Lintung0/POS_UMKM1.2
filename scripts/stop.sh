@@ -1,23 +1,36 @@
 #!/bin/bash
 
-echo "🛑 Stopping POS UMKM System..."
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Stop Backend
-BACKEND_PIDS=$(lsof -ti :8082)
-if [ -n "$BACKEND_PIDS" ]; then
-    kill -9 $BACKEND_PIDS 2>/dev/null
-    echo "✅ Backend stopped"
+echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║      🛑 Lin-POS Stop Script 🛑        ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+echo ""
+
+# Kill backend
+echo -e "${YELLOW}🔍 Stopping backend (port 8082)...${NC}"
+BACKEND_PID=$(lsof -ti:8082)
+if [ ! -z "$BACKEND_PID" ]; then
+    kill -9 $BACKEND_PID
+    echo -e "${GREEN}✅ Backend stopped${NC}"
 else
-    echo "ℹ️  Backend not running"
+    echo -e "${YELLOW}⚠️  Backend not running${NC}"
 fi
 
-# Stop Frontend
-FRONTEND_PIDS=$(pgrep -f "vite.*pos-umkm")
-if [ -n "$FRONTEND_PIDS" ]; then
-    kill -9 $FRONTEND_PIDS 2>/dev/null
-    echo "✅ Frontend stopped"
+# Kill frontend
+echo -e "${YELLOW}🔍 Stopping frontend (port 3000)...${NC}"
+FRONTEND_PID=$(lsof -ti:3000)
+if [ ! -z "$FRONTEND_PID" ]; then
+    kill -9 $FRONTEND_PID
+    echo -e "${GREEN}✅ Frontend stopped${NC}"
 else
-    echo "ℹ️  Frontend not running"
+    echo -e "${YELLOW}⚠️  Frontend not running${NC}"
 fi
 
-echo "✅ System stopped"
+echo ""
+echo -e "${GREEN}✅ Lin-POS stopped successfully!${NC}"
