@@ -1,13 +1,14 @@
 package controllers
 
 import (
+	"backend/config"
+	"backend/models"
+	"backend/utils"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"backend/config"
-	"backend/models"
-	"backend/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,9 +18,40 @@ type ProductionController struct{}
 
 // GetAllProductions retrieves production history
 func (pc *ProductionController) GetAllProductions(c *gin.Context) {
-	// For now, return empty array as we don't have production history table
-	// In future, create a productions table to track production history
-	response := utils.SuccessResponse("Berhasil mengambil data produksi", []interface{}{})
+	var productions []models.Production
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset := (page - 1) * limit
+
+	var total int64
+	config.DB.Model(&models.Production{}).Count(&total)
+
+	result := config.DB.
+		Preload("Product").
+		Preload("Materials.Material").
+		Limit(limit).
+		Offset(offset).
+		Order("created_at desc").
+		Find(&productions)
+
+	if result.Error != nil {
+		response := utils.ErrorResponse("Gagal mengambil data produksi", result.Error)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	responseData := gin.H{
+		"productions": productions,
+		"pagination": gin.H{
+			"page":       page,
+			"limit":      limit,
+			"total":      total,
+			"total_page": (int(total) + limit - 1) / limit,
+		},
+	}
+
+	response := utils.SuccessResponse("Berhasil mengambil data produksi", responseData)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -64,11 +96,11 @@ func (pc *ProductionController) CalculateProductCost(c *gin.Context) {
 		totalCost += materialCost
 
 		costBreakdown = append(costBreakdown, map[string]interface{}{
-			"material_name": recipe.Material.Name,
-			"quantity_used": recipe.QuantityUsed,
-			"unit": recipe.Material.Unit,
+			"material_name":  recipe.Material.Name,
+			"quantity_used":  recipe.QuantityUsed,
+			"unit":           recipe.Material.Unit,
 			"price_per_unit": recipe.Material.PricePerUnit,
-			"total_cost": materialCost,
+			"total_cost":     materialCost,
 		})
 	}
 
@@ -80,22 +112,76 @@ func (pc *ProductionController) CalculateProductCost(c *gin.Context) {
 	}
 
 	response := utils.SuccessResponse("Harga modal berhasil dihitung", map[string]interface{}{
-		"product_id": product.ID,
-		"product_name": product.Name,
+		"product_id":     product.ID,
+		"product_name":   product.Name,
 		"old_cost_price": product.CostPrice,
 		"new_cost_price": totalCost,
 		"cost_breakdown": costBreakdown,
-		"profit_margin": product.SellingPrice - totalCost,
+		"profit_margin":  product.SellingPrice - totalCost,
+	})
+	c.JSON(http.StatusOK, response)
+}
+
+// Calculate max production based on material stock
+func (pc *ProductionController) CalculateMaxProduction(c *gin.Context) {
+	productID := c.Param("id")
+	id, err := strconv.Atoi(productID)
+	if err != nil {
+		response := utils.ErrorResponse("ID produk tidak valid", err)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	var product models.Product
+	if err := config.DB.First(&product, id).Error; err != nil {
+		response := utils.ErrorResponse("Produk tidak ditemukan", err)
+		c.JSON(http.StatusNotFound, response)
+		return
+	}
+
+	var recipes []models.Recipe
+	if err := config.DB.Where("product_id = ?", id).Preload("Material").Find(&recipes).Error; err != nil {
+		response := utils.ErrorResponse("Gagal mengambil resep", err)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	if len(recipes) == 0 {
+		response := utils.ErrorResponse("Produk belum memiliki resep", nil)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	var breakdown []map[string]interface{}
+	var maxProduction float64 = -1
+
+	for _, recipe := range recipes {
+		maxProd := recipe.Material.Stock / recipe.QuantityUsed
+
+		breakdown = append(breakdown, map[string]interface{}{
+			"material_name":   recipe.Material.Name,
+			"available_stock": recipe.Material.Stock,
+			"quantity_needed": recipe.QuantityUsed,
+			"max_production":  maxProd,
+		})
+
+		if maxProduction == -1 || maxProd < maxProduction {
+			maxProduction = maxProd
+		}
+	}
+
+	response := utils.SuccessResponse("Berhasil menghitung stok maksimal", map[string]interface{}{
+		"product_id":     product.ID,
+		"product_name":   product.Name,
+		"max_production": int(maxProduction),
+		"breakdown":      breakdown,
 	})
 	c.JSON(http.StatusOK, response)
 }
 
 // Produce products from materials
 func (pc *ProductionController) ProduceProduct(c *gin.Context) {
-	var req struct {
-		ProductID uint `json:"product_id" binding:"required"`
-		Quantity  int  `json:"quantity" binding:"required,min=1"`
-	}
+	var req models.ProductionRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response := utils.ErrorResponse("Data tidak valid", err)
@@ -135,7 +221,7 @@ func (pc *ProductionController) ProduceProduct(c *gin.Context) {
 
 	for _, recipe := range product.Recipes {
 		totalNeeded := recipe.QuantityUsed * float64(req.Quantity)
-		
+
 		// Check material stock availability
 		if recipe.Material.Stock < totalNeeded {
 			tx.Rollback()
@@ -160,14 +246,37 @@ func (pc *ProductionController) ProduceProduct(c *gin.Context) {
 		})
 	}
 
-	// Reduce material stock atomically
+	// Generate batch number
+	batchNumber := fmt.Sprintf("PROD-%d-%d", req.ProductID, time.Now().Unix())
+
+	// Create production record
+	costPerUnit := totalCost / float64(req.Quantity)
+	production := models.Production{
+		ProductID:        req.ProductID,
+		QuantityProduced: req.Quantity,
+		TotalCost:        totalCost,
+		CostPerUnit:      costPerUnit,
+		BatchNumber:      batchNumber,
+		ProducedBy:       req.ProducedBy,
+		Notes:            req.Notes,
+	}
+
+	if err := tx.Create(&production).Error; err != nil {
+		tx.Rollback()
+		response := utils.ErrorResponse("Gagal membuat record produksi", err)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	// Reduce material stock atomically and save production materials
 	for _, recipe := range product.Recipes {
 		totalNeeded := recipe.QuantityUsed * float64(req.Quantity)
-		
+		materialCost := totalNeeded * recipe.Material.PricePerUnit
+
 		result := tx.Model(&models.RawMaterial{}).
 			Where("id = ? AND stock >= ?", recipe.MaterialID, totalNeeded).
 			Update("stock", gorm.Expr("stock - ?", totalNeeded))
-		
+
 		if result.Error != nil {
 			tx.Rollback()
 			response := utils.ErrorResponse("Gagal mengurangi stok bahan baku", result.Error)
@@ -181,6 +290,21 @@ func (pc *ProductionController) ProduceProduct(c *gin.Context) {
 			c.JSON(http.StatusConflict, response)
 			return
 		}
+
+		// Save production material detail
+		prodMaterial := models.ProductionMaterial{
+			ProductionID: production.ID,
+			MaterialID:   recipe.MaterialID,
+			QuantityUsed: totalNeeded,
+			Cost:         materialCost,
+		}
+
+		if err := tx.Create(&prodMaterial).Error; err != nil {
+			tx.Rollback()
+			response := utils.ErrorResponse("Gagal menyimpan detail bahan produksi", err)
+			c.JSON(http.StatusInternalServerError, response)
+			return
+		}
 	}
 
 	// Add to product stock
@@ -192,7 +316,6 @@ func (pc *ProductionController) ProduceProduct(c *gin.Context) {
 	}
 
 	// Update product cost price based on materials
-	costPerUnit := totalCost / float64(req.Quantity)
 	if err := tx.Model(&product).Update("cost_price", costPerUnit).Error; err != nil {
 		tx.Rollback()
 		response := utils.ErrorResponse("Gagal update harga modal", err)
@@ -208,14 +331,16 @@ func (pc *ProductionController) ProduceProduct(c *gin.Context) {
 	}
 
 	response := utils.SuccessResponse("Produksi berhasil", map[string]interface{}{
-		"product_id":       product.ID,
-		"product_name":     product.Name,
+		"production_id":     production.ID,
+		"batch_number":      batchNumber,
+		"product_id":        product.ID,
+		"product_name":      product.Name,
 		"quantity_produced": req.Quantity,
-		"new_stock":        product.Stock + req.Quantity,
-		"cost_per_unit":    costPerUnit,
-		"total_cost":       totalCost,
-		"material_usage":   materialUsage,
-		"profit_margin":    product.SellingPrice - costPerUnit,
+		"new_stock":         product.Stock + req.Quantity,
+		"cost_per_unit":     costPerUnit,
+		"total_cost":        totalCost,
+		"material_usage":    materialUsage,
+		"profit_margin":     product.SellingPrice - costPerUnit,
 	})
 	c.JSON(http.StatusOK, response)
 }

@@ -3,9 +3,14 @@ import { materialsAPI } from '../utils/api';
 import { formatCurrency } from '../utils/helpers';
 import { Plus, Edit, AlertTriangle, Package2, Search, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '../components/Pagination';
 
 const MaterialsPage = () => {
   const [materials, setMaterials] = useState([]);
+  const [allMaterials, setAllMaterials] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 15;
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
@@ -21,18 +26,51 @@ const MaterialsPage = () => {
 
   useEffect(() => {
     fetchMaterials();
+    
+    // Auto refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchMaterials();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const fetchMaterials = async () => {
     try {
       const response = await materialsAPI.getAll();
-      setMaterials(response.data.data.materials || []);
+      setAllMaterials(response.data.data.materials || []);
     } catch (error) {
       toast.error('Gagal memuat bahan baku');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter and paginate materials
+  useEffect(() => {
+    let filtered = allMaterials;
+    
+    if (showLowStock) {
+      filtered = filtered.filter(m => m.stock <= m.min_stock);
+    }
+    
+    if (searchTerm) {
+      filtered = filtered.filter(m =>
+        m.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setMaterials(filtered.slice(startIndex, endIndex));
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+  }, [allMaterials, searchTerm, showLowStock, currentPage]);
 
   const fetchLowStockMaterials = async () => {
     try {
@@ -96,11 +134,6 @@ const MaterialsPage = () => {
     }
   };
 
-  const filteredMaterials = materials.filter(material =>
-    material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    material.unit.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -114,6 +147,15 @@ const MaterialsPage = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Manajemen Bahan Baku</h1>
         <div className="flex space-x-3">
+          <button
+            onClick={fetchMaterials}
+            disabled={loading}
+            className="btn btn-sm bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center space-x-2"
+            title="Refresh data bahan baku"
+          >
+            <Package2 className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
           <button
             onClick={() => {
               if (showLowStock) {
@@ -170,7 +212,7 @@ const MaterialsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredMaterials.map((material) => (
+              {materials.map((material) => (
                 <tr key={material.id} className="table-row">
                   <td className="table-cell">
                     <div className="flex items-center space-x-3">
@@ -217,6 +259,11 @@ const MaterialsPage = () => {
             </tbody>
           </table>
         </div>
+        <Pagination 
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Modal */}

@@ -1,24 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { CartProvider } from '../context/CartContext';
 import Sidebar from '../components/Sidebar';
-import DashboardPage from '../pages/DashboardPage';
-import CashierPage from '../pages/CashierPage';
-import ProductsPage from '../pages/ProductsPage';
-import MaterialsPage from '../pages/MaterialsPage';
-import ExpensesPage from '../pages/ExpensesPage';
-import ReportsPage from '../pages/ReportsPage';
-import SettingsPage from '../pages/SettingsPage';
-import ProfitAnalysis from '../pages/ProfitAnalysis';
 import { Menu, Bell, X, AlertTriangle } from 'lucide-react';
 import { materialsAPI, productsAPI } from '../utils/api';
 
-const MainLayout = () => {
+const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isCashier = location.pathname === '/kasir';
 
   useEffect(() => {
     // Force fetch on mount
@@ -92,38 +86,12 @@ const MainLayout = () => {
     }
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardPage onNavigate={setActiveTab} />;
-      case 'cashier':
-        return <CashierPage />;
-      case 'products':
-        return <ProductsPage />;
-      case 'materials':
-        return <MaterialsPage />;
-      case 'expenses':
-        return <ExpensesPage />;
-      case 'reports':
-        return <ReportsPage />;
-      case 'profit':
-        return <ProfitAnalysis />;
-      case 'settings':
-        return <SettingsPage />;
-      default:
-        return <DashboardPage onNavigate={setActiveTab} />;
-    }
-  };
-
   return (
-    <CartProvider>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-        <Sidebar 
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      <Sidebar 
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
         
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar */}
@@ -192,7 +160,7 @@ const MainLayout = () => {
                                 key={notif.id}
                                 className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                                 onClick={() => {
-                                  setActiveTab(notif.type === 'material' ? 'materials' : 'products');
+                                  navigate(notif.type === 'material' ? '/bahan-baku' : '/produk');
                                   setShowNotifications(false);
                                 }}
                               >
@@ -242,17 +210,16 @@ const MainLayout = () => {
 
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
-            {activeTab === 'cashier' ? (
-              renderContent()
+            {isCashier ? (
+              children
             ) : (
               <div className="p-6">
-                {renderContent()}
+                {children}
               </div>
             )}
           </main>
         </div>
       </div>
-    </CartProvider>
   );
 };
 

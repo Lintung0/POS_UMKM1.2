@@ -41,16 +41,19 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
     var productResponses []models.ProductResponse
     for _, product := range products {
         availableStock := calculateAvailableStock(product)
+        hasRecipe := len(product.Recipes) > 0
         productResponses = append(productResponses, models.ProductResponse{
-            ID:           product.ID,
-            Name:         product.Name,
-            CostPrice:    product.CostPrice,
-            SellingPrice: product.SellingPrice,
-            Stock:        availableStock,
-            Category:     product.Category,
-            Image:        product.Image,
-            Profit:       product.SellingPrice - product.CostPrice,
-            CreatedAt:    product.CreatedAt,
+            ID:             product.ID,
+            Name:           product.Name,
+            CostPrice:      product.CostPrice,
+            SellingPrice:   product.SellingPrice,
+            Stock:          product.Stock,
+            AvailableStock: availableStock,
+            Category:       product.Category,
+            Image:          product.Image,
+            HasRecipe:      hasRecipe,
+            Profit:         product.SellingPrice - product.CostPrice,
+            CreatedAt:      product.CreatedAt,
         })
     }
     
@@ -145,13 +148,6 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
         return
     }
     
-    // Validate selling price > cost price
-    if request.SellingPrice <= request.CostPrice {
-        response := utils.ErrorResponse("Harga jual harus lebih besar dari harga modal", nil)
-        c.JSON(http.StatusBadRequest, response)
-        return
-    }
-    
     product := models.Product{
         Name:         request.Name,
         CostPrice:    request.CostPrice,
@@ -192,13 +188,6 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
     var request models.ProductRequest
     if err := c.ShouldBindJSON(&request); err != nil {
         response := utils.ErrorResponse("Data tidak valid", err)
-        c.JSON(http.StatusBadRequest, response)
-        return
-    }
-    
-    // Validate selling price > cost price (allow equal for special cases)
-    if request.SellingPrice < request.CostPrice {
-        response := utils.ErrorResponse("Harga jual tidak boleh lebih kecil dari harga modal", nil)
         c.JSON(http.StatusBadRequest, response)
         return
     }

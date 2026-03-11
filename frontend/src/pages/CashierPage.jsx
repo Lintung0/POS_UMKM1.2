@@ -26,6 +26,19 @@ const CashierPage = () => {
 
   useEffect(() => {
     fetchProducts();
+    
+    // Auto refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProducts();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const fetchProducts = async () => {
@@ -95,7 +108,18 @@ const CashierPage = () => {
       {/* Products Section */}
       <div className="flex-1 p-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Kasir</h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Kasir</h1>
+            <button
+              onClick={fetchProducts}
+              disabled={loading}
+              className="btn btn-sm bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center space-x-2"
+              title="Refresh data produk"
+            >
+              <Package className="w-4 h-4" />
+              <span>Refresh</span>
+            </button>
+          </div>
           
           {/* Search and Filter */}
           <div className="flex space-x-4 mb-6">
@@ -130,11 +154,19 @@ const CashierPage = () => {
             
             return (
               <div key={product.id} className="card hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="aspect-square bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
-                  <Package className="w-12 h-12 text-gray-400" />
+                <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                  {product.image ? (
+                    <img 
+                      src={product.image} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Package className="w-12 h-12 text-gray-400" />
+                  )}
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                <p className="text-sm text-gray-600 mb-2">{product.category}</p>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{product.name}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{product.category}</p>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-lg font-bold text-primary">
                     {formatCurrency(product.selling_price)}
@@ -143,12 +175,12 @@ const CashierPage = () => {
                     <span className={`text-sm font-medium ${
                       displayStock <= 0 ? 'text-red-600' : 
                       isLowStock ? 'text-yellow-600' : 
-                      'text-gray-600'
+                      'text-gray-600 dark:text-gray-400'
                     }`}>
                       Stok: {displayStock}
                     </span>
                     {product.has_recipe && (
-                      <p className="text-xs text-blue-600">dari bahan baku</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">dari bahan baku</p>
                     )}
                   </div>
                 </div>

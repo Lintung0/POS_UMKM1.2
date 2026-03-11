@@ -157,7 +157,7 @@ func (mc *MaterialController) UpdateMaterial(c *gin.Context) {
     c.JSON(http.StatusOK, response)
 }
 
-// DeleteMaterial - Delete raw material
+// DeleteMaterial - Delete raw material (cascade delete recipes)
 func (mc *MaterialController) DeleteMaterial(c *gin.Context) {
     id := c.Param("id")
     
@@ -175,19 +175,47 @@ func (mc *MaterialController) DeleteMaterial(c *gin.Context) {
         return
     }
     
-    // Check if material is used in recipes
-    var recipeCount int64
-    config.DB.Model(&models.Recipe{}).Where("material_id = ?", id).Count(&recipeCount)
-    if recipeCount > 0 {
-        response := utils.ErrorResponse("Bahan baku tidak dapat dihapus karena masih digunakan dalam resep", nil)
-        c.JSON(http.StatusBadRequest, response)
+    // Start transaction
+    tx := config.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+    
+    // Delete all recipes that use this material (cascade)
+    if err := tx.Where("material_id = ?", id).Delete(&models.Recipe{}).Error; err != nil {
+        tx.Rollback()
+        response := utils.ErrorResponse("Gagal menghapus resep terkait", err)
+        c.JSON(http.StatusInternalServerError, response)
+        return
+    }
+    
+    // Update has_recipe flag for affected products
+    if err := tx.Exec(`
+        UPDATE products p
+        SET p.has_recipe = CASE
+            WHEN EXISTS (SELECT 1 FROM recipes r WHERE r.product_id = p.id) THEN 1
+            ELSE 0
+        END
+    `).Error; err != nil {
+        tx.Rollback()
+        response := utils.ErrorResponse("Gagal update flag resep", err)
+        c.JSON(http.StatusInternalServerError, response)
         return
     }
     
     // Delete material
-    result = config.DB.Delete(&material)
-    if result.Error != nil {
-        response := utils.ErrorResponse("Gagal menghapus bahan baku", result.Error)
+    if err := tx.Delete(&material).Error; err != nil {
+        tx.Rollback()
+        response := utils.ErrorResponse("Gagal menghapus bahan baku", err)
+        c.JSON(http.StatusInternalServerError, response)
+        return
+    }
+    
+    // Commit transaction
+    if err := tx.Commit().Error; err != nil {
+        response := utils.ErrorResponse("Gagal menyimpan perubahan", err)
         c.JSON(http.StatusInternalServerError, response)
         return
     }

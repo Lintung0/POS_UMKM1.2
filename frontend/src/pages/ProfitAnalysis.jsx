@@ -62,20 +62,85 @@ const ProfitAnalysis = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Analisis Keuntungan</h1>
-        <div className="flex gap-4">
-          <input
-            type="date"
-            value={dateRange.start_date}
-            onChange={(e) => setDateRange(prev => ({ ...prev, start_date: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
-          <input
-            type="date"
-            value={dateRange.end_date}
-            onChange={(e) => setDateRange(prev => ({ ...prev, end_date: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          />
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analisis Keuntungan</h1>
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="card">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Mulai</label>
+            <input
+              type="date"
+              value={dateRange.start_date}
+              onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
+              className="input"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Akhir</label>
+            <input
+              type="date"
+              value={dateRange.end_date}
+              onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+              className="input"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date().toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
+          >
+            Hari Ini
+          </button>
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
+          >
+            7 Hari
+          </button>
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
+          >
+            30 Hari
+          </button>
+          <button
+            onClick={() => {
+              const now = new Date();
+              const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+              setDateRange({
+                start_date: firstDay.toISOString().split('T')[0],
+                end_date: new Date().toISOString().split('T')[0]
+              });
+            }}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
+          >
+            Bulan Ini
+          </button>
+          <button
+            onClick={() => {
+              const now = new Date();
+              const firstDay = new Date(now.getFullYear(), 0, 1);
+              setDateRange({
+                start_date: firstDay.toISOString().split('T')[0],
+                end_date: new Date().toISOString().split('T')[0]
+              });
+            }}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
+          >
+            Tahun Ini
+          </button>
         </div>
       </div>
 
@@ -85,7 +150,7 @@ const ProfitAnalysis = () => {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Pendapatan</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Pendapatan</p>
                 <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(profitSummary.total_revenue)}
                 </p>
@@ -97,7 +162,7 @@ const ProfitAnalysis = () => {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Biaya</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Biaya</p>
                 <p className="text-2xl font-bold text-red-600">
                   {formatCurrency(profitSummary.total_cost)}
                 </p>
@@ -109,7 +174,7 @@ const ProfitAnalysis = () => {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Keuntungan Bersih</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Keuntungan Bersih</p>
                 <p className={`text-2xl font-bold ${profitSummary.total_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(profitSummary.total_profit)}
                 </p>
@@ -121,7 +186,7 @@ const ProfitAnalysis = () => {
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Margin Keuntungan</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Margin Keuntungan</p>
                 <p className={`text-2xl font-bold ${profitSummary.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatPercent(profitSummary.profit_margin)}
                 </p>
@@ -134,15 +199,15 @@ const ProfitAnalysis = () => {
 
       {/* Daily Trend Chart */}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-lg font-semibold mb-4">Tren Keuntungan 7 Hari Terakhir</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Tren Keuntungan 7 Hari Terakhir</h2>
         <div className="space-y-2">
           {dailyTrend.map((day, index) => (
             <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-              <span className="font-medium">{new Date(day.date).toLocaleDateString('id-ID')}</span>
+              <span className="font-medium text-gray-900">{new Date(day.date).toLocaleDateString('id-ID')}</span>
               <div className="flex gap-4 text-sm">
-                <span className="text-green-600">Pendapatan: {formatCurrency(day.revenue)}</span>
-                <span className="text-red-600">Biaya: {formatCurrency(day.cost)}</span>
-                <span className={`font-bold ${day.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className="text-green-700 font-medium">Pendapatan: {formatCurrency(day.revenue)}</span>
+                <span className="text-red-700 font-medium">Biaya: {formatCurrency(day.cost)}</span>
+                <span className={`font-bold ${day.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   Profit: {formatCurrency(day.profit)}
                 </span>
               </div>
@@ -153,27 +218,27 @@ const ProfitAnalysis = () => {
 
       {/* Product Profit Analysis */}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-lg font-semibold mb-4">Analisis Keuntungan per Produk</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Analisis Keuntungan per Produk</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Produk
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Terjual
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Pendapatan
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Biaya
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Keuntungan
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Margin
                 </th>
               </tr>
@@ -184,19 +249,19 @@ const ProfitAnalysis = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {product.product_name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.total_sold}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700">
                     {formatCurrency(product.revenue)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">
                     {formatCurrency(product.cost)}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                     {formatCurrency(product.profit)}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit_margin >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                     {formatPercent(product.profit_margin)}
                   </td>
                 </tr>

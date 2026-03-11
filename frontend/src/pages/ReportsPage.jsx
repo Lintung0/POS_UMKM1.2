@@ -12,16 +12,20 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TransactionDetailModal from '../components/TransactionDetailModal';
+import Pagination from '../components/Pagination';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const ReportsPage = () => {
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 15;
   const [dailyReport, setDailyReport] = useState(null);
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
-  const [topProducts, setTopProducts] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('transactions');
@@ -53,16 +57,15 @@ const ReportsPage = () => {
       const month = today.getMonth() + 1;
       const year = today.getFullYear();
 
-      const [transactionsRes, dailyRes, monthlyRes, trendRes, topProductsRes] = await Promise.all([
+      const [transactionsRes, dailyRes, monthlyRes, trendRes] = await Promise.all([
         transactionsAPI.getAll(),
         transactionsAPI.getDailyReport(dateStr),
         transactionsAPI.getMonthlyReport(`${year}-${month.toString().padStart(2, '0')}`),
-        dashboardAPI.getSalesTrend(30),
-        dashboardAPI.getTopProducts(5)
+        dashboardAPI.getSalesTrend(30)
       ]);
 
       const txData = transactionsRes.data.data.transactions || [];
-      setTransactions(txData);
+      setAllTransactions(txData);
       setDailyReport(dailyRes.data.data);
       setMonthlyReport(monthlyRes.data.data.report);
       
@@ -76,14 +79,6 @@ const ReportsPage = () => {
         date: new Date(item.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
         penjualan: item.total_sales,
         profit: item.total_profit
-      })));
-
-      // Process top products
-      const products = topProductsRes.data.data || [];
-      setTopProducts(products.map(item => ({
-        name: item.product_name,
-        qty: item.total_qty,
-        revenue: item.total_revenue
       })));
 
       // Process payment methods
@@ -128,16 +123,24 @@ const ReportsPage = () => {
     setEndDate(end.toISOString().split('T')[0]);
   };
 
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.id.toString().includes(searchTerm) ||
-                         transaction.cashier_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const txDate = new Date(transaction.created_at).toISOString().split('T')[0];
-    const matchesDateRange = (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
-    const matchesDateFilter = !dateFilter || transaction.created_at.startsWith(dateFilter);
-    const matchesCashier = !cashierFilter || transaction.cashier_name === cashierFilter;
-    const matchesPayment = !paymentFilter || transaction.payment_method === paymentFilter;
-    return matchesSearch && (matchesDateRange || matchesDateFilter) && matchesCashier && matchesPayment;
-  });
+  // Filter and paginate transactions
+  useEffect(() => {
+    const filtered = allTransactions.filter(transaction => {
+      const matchesSearch = transaction.id.toString().includes(searchTerm) ||
+                           transaction.cashier_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const txDate = new Date(transaction.created_at).toISOString().split('T')[0];
+      const matchesDateRange = (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
+      const matchesDateFilter = !dateFilter || transaction.created_at.startsWith(dateFilter);
+      const matchesCashier = !cashierFilter || transaction.cashier_name === cashierFilter;
+      const matchesPayment = !paymentFilter || transaction.payment_method === paymentFilter;
+      return matchesSearch && (matchesDateRange || matchesDateFilter) && matchesCashier && matchesPayment;
+    });
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setTransactions(filtered.slice(startIndex, endIndex));
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+  }, [allTransactions, searchTerm, startDate, endDate, dateFilter, cashierFilter, paymentFilter, currentPage]);
 
   if (loading) {
     return (
@@ -197,52 +200,31 @@ const ReportsPage = () => {
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Products */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
-                <ShoppingBag className="w-5 h-5 mr-2" />
-                Top 5 Produk Terlaris
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={topProducts}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value, name) => name === 'revenue' ? formatCurrency(value) : value} />
-                  <Legend />
-                  <Bar dataKey="qty" fill="#3b82f6" name="Qty Terjual" />
-                  <Bar dataKey="revenue" fill="#10b981" name="Revenue" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Payment Methods */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
-                <CreditCard className="w-5 h-5 mr-2" />
-                Metode Pembayaran
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={paymentMethods}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {paymentMethods.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          {/* Payment Methods */}
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
+              <CreditCard className="w-5 h-5 mr-2" />
+              Metode Pembayaran
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={paymentMethods}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {paymentMethods.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -330,7 +312,7 @@ const ReportsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.map((transaction) => (
+                {transactions.map((transaction) => (
                   <tr key={transaction.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="py-3 px-4 font-mono text-sm">#{transaction.id}</td>
                     <td className="py-3 px-4 text-gray-900 dark:text-gray-100">
@@ -360,6 +342,11 @@ const ReportsPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         </div>
       )}
 

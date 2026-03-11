@@ -1,4 +1,5 @@
 import React from 'react';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
@@ -14,18 +15,18 @@ import {
   X
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen, onToggle, activeTab, onTabChange }) => {
+const Sidebar = ({ isOpen, onToggle }) => {
   const { user, logout } = useAuth();
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'cashier', label: 'Kasir', icon: ShoppingCart },
-    { id: 'products', label: 'Produk', icon: Package },
-    { id: 'materials', label: 'Bahan Baku', icon: Users },
-    { id: 'expenses', label: 'Pengeluaran', icon: DollarSign },
-    { id: 'reports', label: 'Laporan', icon: BarChart3 },
-    { id: 'profit', label: 'Analisis Profit', icon: TrendingUp },
-    { id: 'settings', label: 'Pengaturan', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'cashier', label: 'Kasir', icon: ShoppingCart, path: '/kasir' },
+    { id: 'products', label: 'Produk', icon: Package, path: '/produk' },
+    { id: 'materials', label: 'Bahan Baku', icon: Users, path: '/bahan-baku' },
+    { id: 'expenses', label: 'Pengeluaran', icon: DollarSign, path: '/pengeluaran' },
+    { id: 'reports', label: 'Laporan', icon: BarChart3, path: '/laporan' },
+    { id: 'profit', label: 'Analisis Profit', icon: TrendingUp, path: '/analisis-profit' },
+    { id: 'settings', label: 'Pengaturan', icon: Settings, path: '/pengaturan' },
   ];
 
   const handleLogout = () => {
@@ -86,11 +87,11 @@ const Sidebar = ({ isOpen, onToggle, activeTab, onTabChange }) => {
             <ul className="space-y-2">
               {menuItems.map(item => (
                 <li key={item.id}>
-                  <button
-                    onClick={() => onTabChange(item.id)}
-                    className={`
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) => `
                       w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors
-                      ${activeTab === item.id 
+                      ${isActive 
                         ? 'bg-primary text-white' 
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }
@@ -98,7 +99,7 @@ const Sidebar = ({ isOpen, onToggle, activeTab, onTabChange }) => {
                   >
                     <item.icon className="w-5 h-5" />
                     <span>{item.label}</span>
-                  </button>
+                  </NavLink>
                 </li>
               ))}
             </ul>

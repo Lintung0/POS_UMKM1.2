@@ -3,6 +3,7 @@ import { expensesAPI } from '../utils/api';
 import { formatCurrency } from '../utils/helpers';
 import { Plus, Edit, Trash2, DollarSign, Search, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '../components/Pagination';
 
 const ExpensesPage = () => {
   const [expenses, setExpenses] = useState([]);
@@ -10,7 +11,13 @@ const ExpensesPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
-  const [period, setPeriod] = useState('month');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 15;
+  const [dateRange, setDateRange] = useState({
+    start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    end_date: new Date().toISOString().split('T')[0]
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -32,12 +39,22 @@ const ExpensesPage = () => {
   useEffect(() => {
     fetchExpenses();
     fetchSummary();
-  }, [period, searchTerm]);
+  }, [dateRange, searchTerm, currentPage]);
 
   const fetchExpenses = async () => {
     try {
-      const response = await expensesAPI.getAll({ period, search: searchTerm });
-      setExpenses(response.data.data || []);
+      const response = await expensesAPI.getAll({ 
+        start_date: dateRange.start_date, 
+        end_date: dateRange.end_date, 
+        search: searchTerm 
+      });
+      const allExpenses = response.data.data || [];
+      
+      // Client-side pagination
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      setExpenses(allExpenses.slice(startIndex, endIndex));
+      setTotalPages(Math.ceil(allExpenses.length / itemsPerPage));
     } catch (error) {
       toast.error('Gagal memuat data pengeluaran');
     } finally {
@@ -47,7 +64,10 @@ const ExpensesPage = () => {
 
   const fetchSummary = async () => {
     try {
-      const response = await expensesAPI.getSummary({ period });
+      const response = await expensesAPI.getSummary({ 
+        start_date: dateRange.start_date, 
+        end_date: dateRange.end_date 
+      });
       setSummary(response.data.data);
     } catch (error) {
       console.error('Failed to fetch summary:', error);
@@ -118,7 +138,7 @@ const ExpensesPage = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Pengeluaran</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pengeluaran</h1>
         <button
           onClick={() => {
             setEditingExpense(null);
@@ -148,20 +168,25 @@ const ExpensesPage = () => {
       <div className="card">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Periode</label>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Mulai</label>
+            <input
+              type="date"
+              value={dateRange.start_date}
+              onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
               className="input"
-            >
-              <option value="today">Hari Ini</option>
-              <option value="week">Minggu Ini</option>
-              <option value="month">Bulan Ini</option>
-              <option value="year">Tahun Ini</option>
-            </select>
+            />
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cari</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Akhir</label>
+            <input
+              type="date"
+              value={dateRange.end_date}
+              onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
+              className="input"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cari</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -174,6 +199,48 @@ const ExpensesPage = () => {
             </div>
           </div>
         </div>
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date().toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+          >
+            Hari Ini
+          </button>
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+          >
+            7 Hari
+          </button>
+          <button
+            onClick={() => setDateRange({
+              start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+          >
+            30 Hari
+          </button>
+          <button
+            onClick={() => {
+              const now = new Date();
+              const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+              setDateRange({
+                start_date: firstDay.toISOString().split('T')[0],
+                end_date: new Date().toISOString().split('T')[0]
+              });
+            }}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+          >
+            Bulan Ini
+          </button>
+        </div>
       </div>
 
       {/* Category Breakdown */}
@@ -184,8 +251,8 @@ const ExpensesPage = () => {
             {Object.entries(summary.by_category).map(([category, amount]) => (
               <div key={category} className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">{category}</p>
-                <p className="text-lg font-bold text-gray-900">{formatCurrency(amount)}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(amount)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {((amount / summary.total_amount) * 100).toFixed(1)}%
                 </p>
               </div>
@@ -200,24 +267,24 @@ const ExpensesPage = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-medium text-gray-900">Tanggal</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-900">Kategori</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-900">Keterangan</th>
-                <th className="text-right py-3 px-4 font-medium text-gray-900">Jumlah</th>
-                <th className="text-center py-3 px-4 font-medium text-gray-900">Aksi</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Tanggal</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Kategori</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Keterangan</th>
+                <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white">Jumlah</th>
+                <th className="text-center py-3 px-4 font-medium text-gray-900 dark:text-white">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {expenses.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-8 text-gray-500">
+                  <td colSpan="5" className="text-center py-8 text-gray-500 dark:text-gray-400">
                     Belum ada data pengeluaran
                   </td>
                 </tr>
               ) : (
                 expenses.map((expense) => (
                   <tr key={expense.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-900">
+                    <td className="py-3 px-4 text-gray-900 dark:text-white">
                       {new Date(expense.date).toLocaleDateString('id-ID')}
                     </td>
                     <td className="py-3 px-4">
@@ -225,7 +292,7 @@ const ExpensesPage = () => {
                         {expense.category}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-900">{expense.description}</td>
+                    <td className="py-3 px-4 text-gray-900 dark:text-white">{expense.description}</td>
                     <td className="py-3 px-4 text-right font-semibold text-red-600">
                       {formatCurrency(expense.amount)}
                     </td>
@@ -251,6 +318,11 @@ const ExpensesPage = () => {
             </tbody>
           </table>
         </div>
+        <Pagination 
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Modal */}

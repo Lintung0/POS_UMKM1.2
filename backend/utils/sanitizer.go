@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// SanitizeString removes dangerous characters from input
-func SanitizeString(input string) string {
+// SanitizeInput removes dangerous characters from input (basic sanitization)
+func SanitizeInput(input string) string {
 	// Remove leading/trailing whitespace
 	input = strings.TrimSpace(input)
 	
@@ -49,7 +49,7 @@ func ValidatePositiveInt(num int) bool {
 
 // SanitizeProductName sanitizes product name
 func SanitizeProductName(name string) string {
-	name = SanitizeString(name)
+	name = SanitizeInput(name)
 	// Remove special characters except spaces, hyphens, and parentheses
 	reg := regexp.MustCompile(`[^a-zA-Z0-9\s\-\(\)]`)
 	return reg.ReplaceAllString(name, "")
