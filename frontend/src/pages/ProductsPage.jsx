@@ -6,10 +6,15 @@ import toast from 'react-hot-toast';
 import RecipesPage from './RecipesPage';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Pagination from '../components/Pagination';
 
 const ProductsPage = () => {
   const { user, isAuthenticated } = useAuth();
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 15;
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -27,9 +32,32 @@ const ProductsPage = () => {
     image: ''
   });
   const [imagePreview, setImagePreview] = useState(null);
+  const [categories, setCategories] = useState([
+    'Makanan',
+    'Minuman',
+    'Snack',
+    'Kue',
+    'Roti',
+    'Lainnya'
+  ]);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
 
   useEffect(() => {
     fetchProducts();
+    
+    // Auto refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProducts();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Check authentication before any operation
@@ -61,13 +89,26 @@ const ProductsPage = () => {
   const fetchProducts = async () => {
     try {
       const response = await productsAPI.getAll();
-      setProducts(response.data.data.products || []);
+      setAllProducts(response.data.data.products || []);
     } catch (error) {
       toast.error('Gagal memuat produk');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter and paginate products
+  useEffect(() => {
+    const filtered = allProducts.filter(product =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setProducts(filtered.slice(startIndex, endIndex));
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+  }, [allProducts, searchTerm, currentPage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -139,12 +180,13 @@ const ProductsPage = () => {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
+    const displayStock = product.has_recipe ? product.available_stock : product.stock;
     setFormData({
       name: product.name,
       category: product.category,
       price: product.selling_price?.toString() || product.price?.toString() || '',
       cost: product.cost_price?.toString() || product.cost?.toString() || '',
-      stock: product.stock.toString(),
+      stock: displayStock.toString(),
       description: product.description || '',
       image: product.image || ''
     });
@@ -177,11 +219,6 @@ const ProductsPage = () => {
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (showRecipes) {
     return <RecipesPage productId={selectedProductId} onBack={() => setShowRecipes(false)} />;
   }
@@ -198,13 +235,24 @@ const ProductsPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Manajemen Produk</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn btn-primary flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Produk</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={fetchProducts}
+            disabled={loading}
+            className="btn btn-sm bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center space-x-2"
+            title="Refresh data produk"
+          >
+            <Package className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn btn-primary flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Produk</span>
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -234,7 +282,7 @@ const ProductsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <tr key={product.id} className="table-row">
                   <td className="table-cell">
                     <div className="flex items-center space-x-3">
@@ -255,13 +303,18 @@ const ProductsPage = () => {
                   <td className="table-cell">{formatCurrency(product.selling_price || product.price)}</td>
                   <td className="table-cell">{formatCurrency(product.cost_price || product.cost)}</td>
                   <td className="table-cell">
-                    <span className={`badge ${
-                      product.stock > 10 ? 'badge-success' :
-                      product.stock > 0 ? 'badge-warning' :
-                      'badge-danger'
-                    }`}>
-                      {product.stock}
-                    </span>
+                    {(() => {
+                      const displayStock = product.has_recipe ? product.available_stock : product.stock;
+                      return (
+                        <span className={`badge ${
+                          displayStock > 10 ? 'badge-success' :
+                          displayStock > 0 ? 'badge-warning' :
+                          'badge-danger'
+                        }`}>
+                          {displayStock}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="table-cell">
                     <div className="flex items-center space-x-2">
@@ -296,6 +349,11 @@ const ProductsPage = () => {
             </tbody>
           </table>
         </div>
+        <Pagination 
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Modal */}
@@ -318,13 +376,67 @@ const ProductsPage = () => {
               </div>
               <div className="form-group">
                 <label className="form-label">Kategori</label>
-                <input
-                  type="text"
+                <select
                   value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '__new__') {
+                      setShowNewCategory(true);
+                      setFormData({...formData, category: ''});
+                    } else {
+                      setShowNewCategory(false);
+                      setFormData({...formData, category: value});
+                    }
+                  }}
                   className="input"
-                  required
-                />
+                  required={!showNewCategory}
+                >
+                  <option value="">Pilih Kategori</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="__new__">+ Tambah Kategori Baru</option>
+                </select>
+                
+                {showNewCategory && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="input flex-1"
+                      placeholder="Nama kategori baru..."
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newCategory.trim()) {
+                          if (!categories.includes(newCategory.trim())) {
+                            setCategories([...categories, newCategory.trim()]);
+                          }
+                          setFormData({...formData, category: newCategory.trim()});
+                          setShowNewCategory(false);
+                          setNewCategory('');
+                          toast.success('Kategori baru ditambahkan');
+                        }
+                      }}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      Simpan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewCategory(false);
+                        setNewCategory('');
+                      }}
+                      className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="form-group">

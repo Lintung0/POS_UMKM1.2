@@ -105,6 +105,27 @@ func (rc *RecipeController) SaveRecipes(c *gin.Context) {
         }
     }
     
+    // Update product has_recipe flag
+    if len(request.Recipes) > 0 {
+        if err := tx.Model(&models.Product{}).
+            Where("id = ?", request.ProductID).
+            Update("has_recipe", true).Error; err != nil {
+            tx.Rollback()
+            response := utils.ErrorResponse("Gagal update flag resep", err)
+            c.JSON(http.StatusInternalServerError, response)
+            return
+        }
+    } else {
+        if err := tx.Model(&models.Product{}).
+            Where("id = ?", request.ProductID).
+            Update("has_recipe", false).Error; err != nil {
+            tx.Rollback()
+            response := utils.ErrorResponse("Gagal update flag resep", err)
+            c.JSON(http.StatusInternalServerError, response)
+            return
+        }
+    }
+    
     // Commit transaction
     if err := tx.Commit().Error; err != nil {
         response := utils.ErrorResponse("Gagal menyimpan resep", err)

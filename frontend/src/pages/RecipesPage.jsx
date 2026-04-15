@@ -24,7 +24,7 @@ const RecipesPage = ({ productId, onBack }) => {
       const [productRes, recipesRes, materialsRes] = await Promise.all([
         productsAPI.getById(productId),
         recipesAPI.getByProduct(productId),
-        materialsAPI.getAll()
+        materialsAPI.getAllNoPagination()
       ]);
 
       setProduct(productRes.data.data);

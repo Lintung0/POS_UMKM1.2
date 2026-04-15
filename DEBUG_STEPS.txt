@@ -1,0 +1,116 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║          LANGKAH DEBUGGING - STOK TIDAK BERKURANG                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+🔍 LANGKAH 1: CEK DATABASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   $ cd /home/kirek/code/POS_UMKM-master
+   $ ./verify-stock.sh
+
+   Cek output:
+   - Apakah produk punya has_recipe = 1?
+   - Apakah ada resep di tabel recipes?
+   - Berapa stok bahan baku saat ini?
+
+🔧 LANGKAH 2: FIX HAS_RECIPE FLAG (jika perlu)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Jika has_recipe = 0 padahal produk punya resep:
+   
+   $ ./fix-has-recipe.sh
+
+   Script ini akan:
+   ✅ Set has_recipe = 1 untuk produk dengan resep
+   ✅ Set has_recipe = 0 untuk produk tanpa resep
+
+🚀 LANGKAH 3: RESTART BACKEND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Terminal 1:
+   $ cd backend
+   $ go run main.go
+
+   PERHATIKAN LOG DEBUG saat transaksi:
+   ✅ DEBUG: Product ID=X, Name=..., HasRecipe=true
+   ✅ DEBUG: Mengurangi bahan baku untuk produk ...
+   ✅ DEBUG: Material ID=X, Name=..., Needed=...
+   ✅ DEBUG: Berhasil kurangi material ...
+
+🧪 LANGKAH 4: TEST TRANSAKSI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   1. Catat stok bahan baku SEBELUM:
+      $ ./verify-stock.sh
+      
+      Contoh:
+      Telur: 100 butir
+      Minyak: 500 ml
+
+   2. Buka browser: http://localhost:3000/kasir
+
+   3. Tambah produk dengan resep (contoh: Telur Dadar 2 porsi)
+
+   4. Proses pembayaran
+
+   5. LIHAT TERMINAL BACKEND untuk log DEBUG
+
+   6. Cek stok SESUDAH:
+      $ ./verify-stock.sh
+      
+      Expected:
+      Telur: 96 butir (100 - 4) ✅
+      Minyak: 480 ml (500 - 20) ✅
+
+📊 LANGKAH 5: VERIFIKASI HASIL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Jika BERHASIL:
+   ✅ Log DEBUG muncul di terminal
+   ✅ Stok bahan baku berkurang
+   ✅ Transaksi tersimpan di database
+   ✅ UI update otomatis
+
+   Jika GAGAL:
+   ❌ Tidak ada log DEBUG → has_recipe masih false
+   ❌ Ada log tapi stok tidak berkurang → transaksi rollback
+   ❌ Error di terminal → cek error message
+
+🐛 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Problem: has_recipe = 0 padahal ada resep
+   Solution: ./fix-has-recipe.sh
+
+   Problem: Log DEBUG tidak muncul
+   Solution: Restart backend, pastikan kode terbaru
+
+   Problem: Log muncul tapi stok tidak berkurang
+   Solution: Cek error setelah log, mungkin rollback
+
+   Problem: Error "Stok tidak cukup"
+   Solution: Cek stok bahan baku, mungkin memang habis
+
+📚 DOKUMENTASI LENGKAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Lihat file: DEBUGGING_STOCK.md
+   - Query SQL lengkap
+   - Troubleshooting detail
+   - Test cases
+
+✅ CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   [ ] Jalankan verify-stock.sh
+   [ ] Fix has_recipe jika perlu
+   [ ] Restart backend
+   [ ] Catat stok SEBELUM
+   [ ] Lakukan transaksi
+   [ ] Perhatikan log DEBUG
+   [ ] Cek stok SESUDAH
+   [ ] Bandingkan hasil
+
+╔══════════════════════════════════════════════════════════════════════╗
+║                    SELAMAT DEBUGGING! 🔧                             ║
+╚══════════════════════════════════════════════════════════════════════╝

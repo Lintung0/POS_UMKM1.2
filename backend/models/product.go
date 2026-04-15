@@ -12,7 +12,8 @@ type Product struct {
     SellingPrice     float64             `gorm:"type:decimal(10,2);not null" json:"selling_price"`
     Stock            int                 `gorm:"default:0" json:"stock"`
     Category         string              `gorm:"size:50;default:'Umum';index" json:"category"`
-    Image            string              `gorm:"size:255" json:"image"`
+    Image            string              `gorm:"type:longtext" json:"image"`
+    HasRecipe        bool                `gorm:"default:false" json:"has_recipe"`
     Recipes          []Recipe            `gorm:"foreignKey:ProductID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"recipes,omitempty"`
     TransactionDetails []TransactionDetail `gorm:"foreignKey:ProductID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"transaction_details,omitempty"`
     CreatedAt        time.Time           `gorm:"index" json:"created_at"`
@@ -21,15 +22,17 @@ type Product struct {
 }
 
 type ProductResponse struct {
-	ID           uint      `json:"id"`
-    Name         string    `json:"name"`
-    CostPrice    float64   `json:"cost_price"`
-    SellingPrice float64   `json:"selling_price"`
-    Stock        int       `json:"stock"`
-    Category     string    `json:"category"`
-    Image        string    `json:"image"`
-    Profit       float64   `json:"profit"`
-    CreatedAt    time.Time `json:"created_at"`
+	ID             uint      `json:"id"`
+    Name           string    `json:"name"`
+    CostPrice      float64   `json:"cost_price"`
+    SellingPrice   float64   `json:"selling_price"`
+    Stock          int       `json:"stock"`
+    AvailableStock int       `json:"available_stock"`
+    Category       string    `json:"category"`
+    Image          string    `json:"image"`
+    HasRecipe      bool      `json:"has_recipe"`
+    Profit         float64   `json:"profit"`
+    CreatedAt      time.Time `json:"created_at"`
 }
 
 type ProductRequest struct {
@@ -41,22 +44,24 @@ type ProductRequest struct {
     Image        string  `json:"image"`
 }
 
-// GetAvailableStock menghitung stok tersedia dari bahan baku
-// Jika produk punya recipe, hitung dari bahan baku
-// Jika tidak, gunakan field stock
+// GetAvailableStock menghitung stok tersedia
+// Produk dengan resep: hitung dari bahan baku
+// Produk tanpa resep: gunakan field stock
 func (p *Product) GetAvailableStock(db *gorm.DB) int {
-	// Jika produk tidak punya recipe, gunakan stock field
-	if len(p.Recipes) == 0 {
+	if !p.HasRecipe {
 		return p.Stock
 	}
-	
-	// Load recipes dengan materials jika belum di-load
-	if len(p.Recipes) > 0 && p.Recipes[0].Material.ID == 0 {
-		db.Preload("Recipes.Material").First(&p, p.ID)
+
+	// Load jika belum ada
+	if len(p.Recipes) == 0 {
+		db.Preload("Material").Where("product_id = ?", p.ID).Find(&p.Recipes)
 	}
-	
-	// Hitung berapa banyak produk yang bisa dibuat dari bahan baku
-	minStock := 999999
+
+	if len(p.Recipes) == 0 {
+		return 0
+	}
+
+	minStock := int(^uint(0) >> 1)
 	for _, recipe := range p.Recipes {
 		if recipe.QuantityUsed <= 0 {
 			continue
@@ -66,8 +71,8 @@ func (p *Product) GetAvailableStock(db *gorm.DB) int {
 			minStock = canMake
 		}
 	}
-	
-	if minStock == 999999 {
+
+	if minStock == int(^uint(0)>>1) {
 		return 0
 	}
 	return minStock

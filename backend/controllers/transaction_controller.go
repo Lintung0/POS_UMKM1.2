@@ -5,7 +5,6 @@ import (
 	"backend/models"
 	"backend/utils"
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -52,9 +51,8 @@ func (tc *TransactionController) CreateTransaction(c *gin.Context) {
 	for _, item := range req.Items {
 		var product models.Product
 
-		// Ambil produk dengan resep untuk validasi bahan baku - WITH LOCK
+		// Step 1: Lock row produk dulu
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Preload("Recipes.Material").
 			First(&product, item.ProductID).Error; err != nil {
 			tx.Rollback()
 			response := utils.ErrorResponse("Produk tidak ditemukan", err)
@@ -62,134 +60,59 @@ func (tc *TransactionController) CreateTransaction(c *gin.Context) {
 			return
 		}
 
-		// ==============================================
-		// LOGIKA PENTING: VALIDASI STOK DARI BAHAN BAKU
-		// ==============================================
-		availableStock := product.GetAvailableStock(tx)
-		
-		if availableStock <= 0 {
+		// Step 2: Load recipes + materials secara terpisah (Preload tidak kompatibel dengan FOR UPDATE)
+		if err := tx.Preload("Material").Where("product_id = ?", product.ID).Find(&product.Recipes).Error; err != nil {
 			tx.Rollback()
-			msg := fmt.Sprintf("Produk %s habis", product.Name)
-			response := utils.ErrorResponse(msg, nil)
-			c.JSON(http.StatusBadRequest, response)
+			response := utils.ErrorResponse("Gagal memuat resep produk", err)
+			c.JSON(http.StatusInternalServerError, response)
 			return
 		}
 
+		// Validasi stok
+		availableStock := product.GetAvailableStock(tx)
 		if availableStock < item.Quantity {
 			tx.Rollback()
-			msg := fmt.Sprintf("Stok %s tidak cukup. Tersedia: %d, Dibutuhkan: %d",
-				product.Name, availableStock, item.Quantity)
-			response := utils.ErrorResponse(msg, nil)
+			response := utils.ErrorResponse("Stok tidak cukup untuk "+product.Name, nil)
 			c.JSON(http.StatusBadRequest, response)
 			return
 		}
 
-		// ==============================================
-		// LOGIKA PENTING: KURANGI STOK BAHAN BAKU OTOMATIS
-		// ==============================================
-		// Cek apakah produk memiliki resep (menggunakan bahan baku)
-		if len(product.Recipes) > 0 {
-			// Produk menggunakan bahan baku - kurangi stok bahan baku
+		// Kurangi stok
+		if product.HasRecipe && len(product.Recipes) > 0 {
+			// Produk dengan resep: kurangi bahan baku
 			for _, recipe := range product.Recipes {
-				totalMaterialNeeded := recipe.QuantityUsed * float64(item.Quantity)
+				if recipe.QuantityUsed <= 0 {
+					continue
+				}
+				totalNeeded := recipe.QuantityUsed * float64(item.Quantity)
 
-				// Lock material row and check stock
+				// Lock bahan baku lalu kurangi
 				var material models.RawMaterial
-				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-					First(&material, recipe.MaterialID).Error; err != nil {
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&material, recipe.MaterialID).Error; err != nil {
 					tx.Rollback()
 					response := utils.ErrorResponse("Bahan baku tidak ditemukan", err)
 					c.JSON(http.StatusInternalServerError, response)
 					return
 				}
-
-				// Cek ketersediaan bahan baku
-				if material.Stock < totalMaterialNeeded {
+				if material.Stock < totalNeeded {
 					tx.Rollback()
-					msg := fmt.Sprintf("Bahan baku %s tidak cukup. Tersedia: %.2f %s, Dibutuhkan: %.2f %s",
-						material.Name, material.Stock, material.Unit,
-						totalMaterialNeeded, material.Unit)
-					response := utils.ErrorResponse(msg, nil)
+					response := utils.ErrorResponse("Stok bahan baku "+material.Name+" tidak cukup", nil)
 					c.JSON(http.StatusBadRequest, response)
 					return
 				}
-
-				// Kurangi stok bahan baku dengan atomic update
-				result := tx.Model(&models.RawMaterial{}).
-					Where("id = ? AND stock >= ?", recipe.MaterialID, totalMaterialNeeded).
-					Update("stock", gorm.Expr("stock - ?", totalMaterialNeeded))
-				
-				if result.Error != nil {
+				if err := tx.Model(&material).Update("stock", gorm.Expr("stock - ?", totalNeeded)).Error; err != nil {
 					tx.Rollback()
-					response := utils.ErrorResponse("Gagal mengurangi stok bahan baku", result.Error)
+					response := utils.ErrorResponse("Gagal mengurangi stok bahan baku", err)
 					c.JSON(http.StatusInternalServerError, response)
 					return
 				}
-
-				// Verifikasi update berhasil
-				if result.RowsAffected == 0 {
-					tx.Rollback()
-					response := utils.ErrorResponse("Stok bahan baku berubah saat transaksi", nil)
-					c.JSON(http.StatusConflict, response)
-					return
-				}
-			}
-			
-			// PENTING: Kurangi juga stok produk jadi setelah bahan baku dikurangi
-			result := tx.Model(&product).
-				Where("id = ? AND stock >= ?", product.ID, item.Quantity).
-				Update("stock", gorm.Expr("stock - ?", item.Quantity))
-			
-			if result.Error != nil {
-				tx.Rollback()
-				response := utils.ErrorResponse("Gagal mengurangi stok produk", result.Error)
-				c.JSON(http.StatusInternalServerError, response)
-				return
-			}
-
-			if result.RowsAffected == 0 {
-				tx.Rollback()
-				response := utils.ErrorResponse("Stok produk berubah saat transaksi", nil)
-				c.JSON(http.StatusConflict, response)
-				return
 			}
 		} else {
-			// Produk tidak menggunakan bahan baku - langsung kurangi stok produk
-			// Lock product and check stock
-			var productCheck models.Product
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				First(&productCheck, product.ID).Error; err != nil {
+			// Produk tanpa resep: kurangi stok produk
+			if err := tx.Model(&product).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 				tx.Rollback()
-				response := utils.ErrorResponse("Produk tidak ditemukan", err)
+				response := utils.ErrorResponse("Gagal mengurangi stok produk", err)
 				c.JSON(http.StatusInternalServerError, response)
-				return
-			}
-
-			if productCheck.Stock < item.Quantity {
-				tx.Rollback()
-				msg := fmt.Sprintf("Stok %s tidak cukup. Tersedia: %d, Dibutuhkan: %d",
-					product.Name, productCheck.Stock, item.Quantity)
-				response := utils.ErrorResponse(msg, nil)
-				c.JSON(http.StatusBadRequest, response)
-				return
-			}
-
-			// Kurangi stok produk jadi dengan atomic update
-			result := tx.Model(&product).
-				Where("id = ? AND stock >= ?", product.ID, item.Quantity).
-				Update("stock", gorm.Expr("stock - ?", item.Quantity))
-			
-			if result.Error != nil {
-				tx.Rollback()
-				response := utils.ErrorResponse("Gagal mengurangi stok produk", result.Error)
-				c.JSON(http.StatusInternalServerError, response)
-				return
-			}
-
-			if result.RowsAffected == 0 {
-				tx.Rollback()
-				response := utils.ErrorResponse("Stok produk berubah saat transaksi", nil)
-				c.JSON(http.StatusConflict, response)
 				return
 			}
 		}
@@ -220,9 +143,7 @@ func (tc *TransactionController) CreateTransaction(c *gin.Context) {
 	// Validasi uang bayar
 	if req.CashReceived < totalAmount {
 		tx.Rollback()
-		msg := fmt.Sprintf("Uang tidak cukup. Total: %.2f, Diterima: %.2f, Kekurangan: %.2f",
-			totalAmount, req.CashReceived, totalAmount-req.CashReceived)
-		response := utils.ErrorResponse(msg, nil)
+		response := utils.ErrorResponse("Uang yang diterima tidak cukup", nil)
 		c.JSON(http.StatusBadRequest, response)
 		return
 	}

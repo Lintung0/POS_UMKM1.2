@@ -3,8 +3,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { CartProvider } from './context/CartContext';
 import LoginPage from './pages/LoginPage';
 import MainLayout from './components/MainLayout';
+import DashboardPage from './pages/DashboardPage';
+import CashierPage from './pages/CashierPage';
+import ProductsPage from './pages/ProductsPage';
+import MaterialsPage from './pages/MaterialsPage';
+import ExpensesPage from './pages/ExpensesPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
+import ProfitAnalysis from './pages/ProfitAnalysis';
 import './index.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -34,8 +43,17 @@ const AppContent = () => {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/*" element={<ProtectedRoute><MainLayout /></ProtectedRoute>} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/dashboard" element={<ProtectedRoute><MainLayout><DashboardPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/kasir" element={<ProtectedRoute><MainLayout><CashierPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/produk" element={<ProtectedRoute><MainLayout><ProductsPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/bahan-baku" element={<ProtectedRoute><MainLayout><MaterialsPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/pengeluaran" element={<ProtectedRoute><MainLayout><ExpensesPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/laporan" element={<ProtectedRoute><MainLayout><ReportsPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/analisis-profit" element={<ProtectedRoute><MainLayout><ProfitAnalysis /></MainLayout></ProtectedRoute>} />
+      <Route path="/pengaturan" element={<ProtectedRoute><MainLayout><SettingsPage /></MainLayout></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 };
@@ -45,27 +63,29 @@ function App() {
     <Router>
       <ThemeProvider>
         <AuthProvider>
-          <AppContent />
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-              success: {
+          <CartProvider>
+            <AppContent />
+            <Toaster 
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
                 style: {
-                  background: '#10b981',
+                  background: '#363636',
+                  color: '#fff',
                 },
-              },
-              error: {
-                style: {
-                  background: '#ef4444',
+                success: {
+                  style: {
+                    background: '#10b981',
+                  },
                 },
-              },
-            }}
-          />
+                error: {
+                  style: {
+                    background: '#ef4444',
+                  },
+                },
+              }}
+            />
+          </CartProvider>
         </AuthProvider>
       </ThemeProvider>
     </Router>

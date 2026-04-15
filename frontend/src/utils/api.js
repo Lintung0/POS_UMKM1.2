@@ -27,18 +27,36 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only redirect to login if token is actually invalid/expired
+    // Don't redirect for authorization errors (403) or other 401 errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const errorMsg = error.response?.data?.message?.toLowerCase() || '';
+      const errorData = error.response?.data?.error?.toLowerCase() || '';
+      
+      // Check if it's a token-related error
+      const isTokenError = 
+        errorMsg.includes('token') || 
+        errorMsg.includes('jwt') ||
+        errorMsg.includes('expired') ||
+        errorMsg.includes('invalid token') ||
+        errorMsg.includes('authentication failed') ||
+        errorData.includes('token') ||
+        errorData.includes('jwt');
+      
+      if (isTokenError) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      // Otherwise, let the component handle the error
     }
     return Promise.reject(error);
   }
 );
 
-// Auth API
+// Auth API (uses different base URL - no /api prefix)
 export const authAPI = {
-  login: (credentials) => api.post('/auth/login', credentials),
+  login: (credentials) => axios.post('http://localhost:8080/login', credentials),
 };
 
 // Products API
@@ -54,6 +72,7 @@ export const productsAPI = {
 // Materials API
 export const materialsAPI = {
   getAll: (params = {}) => api.get('/materials', { params: { ...params, _t: Date.now() } }),
+  getAllNoPagination: () => api.get('/materials', { params: { page: 1, limit: 9999, _t: Date.now() } }),
   getLowStock: () => api.get('/materials/low-stock', { params: { _t: Date.now() } }),
   create: (data) => api.post('/materials', data),
   update: (id, data) => api.put(`/materials/${id}`, data),
@@ -107,10 +126,10 @@ export const profitAPI = {
   getTrend: () => api.get('/profit/trend', { params: { _t: Date.now() } }),
 };
 
-// Settings API (placeholder)
+// Settings API
 export const settingsAPI = {
-  get: () => Promise.resolve({ data: { data: { store_name: 'UMKM Store', store_address: 'Jl. Contoh No. 123', store_phone: '08123456789' } } }),
-  update: (data) => Promise.resolve({ data: { success: true } }),
+  get: () => api.get('/settings'),
+  update: (data) => api.put('/settings', data),
 };
 
 export default api;

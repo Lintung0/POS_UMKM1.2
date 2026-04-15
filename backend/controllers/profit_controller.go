@@ -59,6 +59,14 @@ func (pc *ProfitController) GetProfitAnalysis(c *gin.Context) {
 		return
 	}
 
+	// Load all products once
+	var products []models.Product
+	config.DB.Find(&products)
+	productMap := make(map[string]float64)
+	for _, p := range products {
+		productMap[p.Name] = p.CostPrice
+	}
+
 	var totalRevenue, totalCost, totalProfit float64
 	transactionCount := len(transactions)
 
@@ -67,9 +75,8 @@ func (pc *ProfitController) GetProfitAnalysis(c *gin.Context) {
 		totalProfit += transaction.TotalProfit
 		
 		for _, detail := range transaction.Details {
-			var product models.Product
-			if err := config.DB.Where("name = ?", detail.ProductName).First(&product).Error; err == nil {
-				totalCost += product.CostPrice * float64(detail.Qty)
+			if costPrice, exists := productMap[detail.ProductName]; exists {
+				totalCost += costPrice * float64(detail.Qty)
 			}
 		}
 	}
@@ -111,6 +118,14 @@ func GetProfitSummary(c *gin.Context) {
 		return
 	}
 
+	// Load all products once and create a map for fast lookup
+	var products []models.Product
+	config.DB.Find(&products)
+	productMap := make(map[string]float64)
+	for _, p := range products {
+		productMap[p.Name] = p.CostPrice
+	}
+
 	var totalRevenue, totalCost float64
 	transactionCount := len(transactions)
 
@@ -118,9 +133,8 @@ func GetProfitSummary(c *gin.Context) {
 		totalRevenue += transaction.TotalAmount
 		
 		for _, detail := range transaction.Details {
-			var product models.Product
-			if err := config.DB.Where("name = ?", detail.ProductName).First(&product).Error; err == nil {
-				totalCost += product.CostPrice * float64(detail.Qty)
+			if costPrice, exists := productMap[detail.ProductName]; exists {
+				totalCost += costPrice * float64(detail.Qty)
 			}
 		}
 	}
@@ -158,27 +172,34 @@ func GetProductProfitAnalysis(c *gin.Context) {
 		return
 	}
 
-	productMap := make(map[string]*ProductProfit)
+	// Load all products once
+	var products []models.Product
+	config.DB.Find(&products)
+	productMap := make(map[string]float64)
+	for _, p := range products {
+		productMap[p.Name] = p.CostPrice
+	}
+
+	profitMap := make(map[string]*ProductProfit)
 
 	for _, detail := range details {
-		if _, exists := productMap[detail.ProductName]; !exists {
-			productMap[detail.ProductName] = &ProductProfit{
+		if _, exists := profitMap[detail.ProductName]; !exists {
+			profitMap[detail.ProductName] = &ProductProfit{
 				ProductName: detail.ProductName,
 			}
 		}
 
-		profit := productMap[detail.ProductName]
+		profit := profitMap[detail.ProductName]
 		profit.TotalSold += detail.Qty
 		profit.Revenue += detail.TotalPrice
 
-		var product models.Product
-		if err := config.DB.Where("name = ?", detail.ProductName).First(&product).Error; err == nil {
-			profit.Cost += product.CostPrice * float64(detail.Qty)
+		if costPrice, exists := productMap[detail.ProductName]; exists {
+			profit.Cost += costPrice * float64(detail.Qty)
 		}
 	}
 
 	var result []ProductProfit
-	for _, profit := range productMap {
+	for _, profit := range profitMap {
 		profit.Profit = profit.Revenue - profit.Cost
 		if profit.Revenue > 0 {
 			profit.ProfitMargin = (profit.Profit / profit.Revenue) * 100
@@ -197,6 +218,14 @@ func GetDailyProfitTrend(c *gin.Context) {
 		Profit  float64 `json:"profit"`
 	}
 
+	// Load all products once
+	var products []models.Product
+	config.DB.Find(&products)
+	productMap := make(map[string]float64)
+	for _, p := range products {
+		productMap[p.Name] = p.CostPrice
+	}
+
 	var result []DailyProfit
 	
 	for i := 0; i < 7; i++ {
@@ -210,9 +239,8 @@ func GetDailyProfitTrend(c *gin.Context) {
 			dayRevenue += transaction.TotalAmount
 			
 			for _, detail := range transaction.Details {
-				var product models.Product
-				if err := config.DB.Where("name = ?", detail.ProductName).First(&product).Error; err == nil {
-					dayCost += product.CostPrice * float64(detail.Qty)
+				if costPrice, exists := productMap[detail.ProductName]; exists {
+					dayCost += costPrice * float64(detail.Qty)
 				}
 			}
 		}
