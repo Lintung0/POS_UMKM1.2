@@ -120,7 +120,7 @@ const PaymentModal = ({ isOpen, onClose, cartItems, totalAmount, onSuccess }) =>
                 }`}
               >
                 <CreditCard className="w-5 h-5" />
-                <span>Kartu</span>
+                <span>Non Tunai</span>
               </button>
             </div>
           </div>

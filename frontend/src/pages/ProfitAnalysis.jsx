@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, Banknote, BarChart3, Calendar } from 'lucide-react';
 import { profitAPI } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -147,7 +147,7 @@ const ProfitAnalysis = () => {
       {/* Summary Cards */}
       {profitSummary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Pendapatan</p>
@@ -155,11 +155,11 @@ const ProfitAnalysis = () => {
                   {formatCurrency(profitSummary.total_revenue)}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
+              <Banknote className="h-8 w-8 text-green-600" />
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Biaya</p>
@@ -171,7 +171,7 @@ const ProfitAnalysis = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Keuntungan Bersih</p>
@@ -183,7 +183,7 @@ const ProfitAnalysis = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Margin Keuntungan</p>
@@ -198,16 +198,16 @@ const ProfitAnalysis = () => {
       )}
 
       {/* Daily Trend Chart */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Tren Keuntungan 7 Hari Terakhir</h2>
         <div className="space-y-2">
           {dailyTrend.map((day, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-              <span className="font-medium text-gray-900">{new Date(day.date).toLocaleDateString('id-ID')}</span>
+            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
+              <span className="font-medium text-gray-900 dark:text-gray-100">{new Date(day.date).toLocaleDateString('id-ID')}</span>
               <div className="flex gap-4 text-sm">
-                <span className="text-green-700 font-medium">Pendapatan: {formatCurrency(day.revenue)}</span>
-                <span className="text-red-700 font-medium">Biaya: {formatCurrency(day.cost)}</span>
-                <span className={`font-bold ${day.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <span className="text-green-600 dark:text-green-400 font-medium">Pendapatan: {formatCurrency(day.revenue)}</span>
+                <span className="text-red-600 dark:text-red-400 font-medium">Biaya: {formatCurrency(day.cost)}</span>
+                <span className={`font-bold ${day.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   Profit: {formatCurrency(day.profit)}
                 </span>
               </div>
@@ -217,51 +217,51 @@ const ProfitAnalysis = () => {
       </div>
 
       {/* Product Profit Analysis */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Analisis Keuntungan per Produk</h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Produk
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Terjual
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Pendapatan
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Biaya
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Keuntungan
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                   Margin
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {productProfits.map((product, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                     {product.product_name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                     {product.total_sold}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
                     {formatCurrency(product.revenue)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-400">
                     {formatCurrency(product.cost)}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                     {formatCurrency(product.profit)}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit_margin >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${product.profit_margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                     {formatPercent(product.profit_margin)}
                   </td>
                 </tr>

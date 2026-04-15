@@ -72,6 +72,7 @@ export const productsAPI = {
 // Materials API
 export const materialsAPI = {
   getAll: (params = {}) => api.get('/materials', { params: { ...params, _t: Date.now() } }),
+  getAllNoPagination: () => api.get('/materials', { params: { page: 1, limit: 9999, _t: Date.now() } }),
   getLowStock: () => api.get('/materials/low-stock', { params: { _t: Date.now() } }),
   create: (data) => api.post('/materials', data),
   update: (id, data) => api.put(`/materials/${id}`, data),

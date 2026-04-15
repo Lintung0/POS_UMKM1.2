@@ -43,7 +43,7 @@ const MaterialsPage = () => {
 
   const fetchMaterials = async () => {
     try {
-      const response = await materialsAPI.getAll();
+      const response = await materialsAPI.getAllNoPagination();
       setAllMaterials(response.data.data.materials || []);
     } catch (error) {
       toast.error('Gagal memuat bahan baku');

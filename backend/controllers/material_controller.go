@@ -65,6 +65,7 @@ func (mc *MaterialController) GetLowStockMaterials(c *gin.Context) {
             'CRITICAL' as stock_status
         FROM raw_materials
         WHERE stock < min_stock
+        AND deleted_at IS NULL
         ORDER BY stock ASC
     `
     

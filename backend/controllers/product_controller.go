@@ -75,8 +75,8 @@ func calculateAvailableStock(product models.Product) int {
     if len(product.Recipes) == 0 {
         return product.Stock
     }
-    
-    minStock := product.Stock
+
+    minStock := int(^uint(0) >> 1)
     for _, recipe := range product.Recipes {
         if recipe.Material.ID > 0 && recipe.QuantityUsed > 0 {
             possibleUnits := int(recipe.Material.Stock / recipe.QuantityUsed)
@@ -85,22 +85,10 @@ func calculateAvailableStock(product models.Product) int {
             }
         }
     }
-    
-    // If no recipes loaded properly, return 0 to be safe
-    if minStock == product.Stock && len(product.Recipes) > 0 {
-        // Check if any recipe has material loaded
-        hasLoadedMaterial := false
-        for _, recipe := range product.Recipes {
-            if recipe.Material.ID > 0 {
-                hasLoadedMaterial = true
-                break
-            }
-        }
-        if !hasLoadedMaterial {
-            return 0 // Materials not loaded, return 0 to prevent overselling
-        }
+
+    if minStock == int(^uint(0)>>1) {
+        return 0
     }
-    
     return minStock
 }
 
@@ -192,17 +180,19 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
         return
     }
     
-    // Update product
-    product.Name = request.Name
-    product.CostPrice = request.CostPrice
-    product.SellingPrice = request.SellingPrice
-    product.Stock = request.Stock
-    product.Category = request.Category
-    if request.Image != "" {
-        product.Image = request.Image
+    // Update product (exclude has_recipe to prevent overwrite)
+    updates := map[string]interface{}{
+        "name":          request.Name,
+        "cost_price":    request.CostPrice,
+        "selling_price": request.SellingPrice,
+        "stock":         request.Stock,
+        "category":      request.Category,
     }
-    
-    result = config.DB.Save(&product)
+    if request.Image != "" {
+        updates["image"] = request.Image
+    }
+
+    result = config.DB.Model(&product).Updates(updates)
     if result.Error != nil {
         response := utils.ErrorResponse("Gagal mengupdate produk", result.Error)
         c.JSON(http.StatusInternalServerError, response)

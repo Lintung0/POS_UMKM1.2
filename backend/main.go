@@ -1,6 +1,9 @@
 package main
 
 import (
+	"backend/config"
+	"backend/models"
+	"backend/routes"
 	"context"
 	"log"
 	"net/http"
@@ -9,9 +12,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"backend/config"
-	"backend/routes"
-	"backend/models"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
@@ -43,9 +43,9 @@ func main() {
 	}
 
 	log.Printf("🚀 Server starting on http://localhost:%s", port)
-    log.Printf("📊 API Health Check: http://localhost:%s/health", port)
-    log.Printf("🔗 API Base URL: http://localhost:%s/api", port)
-    log.Printf("🕐 Server Time: %s", time.Now().Format("2006-01-02 15:04:05"))
+	log.Printf("📊 API Health Check: http://localhost:%s/health", port)
+	log.Printf("🔗 API Base URL: http://localhost:%s/api", port)
+	log.Printf("🕐 Server Time: %s", time.Now().Format("2006-01-02 15:04:05"))
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -90,9 +90,9 @@ func migrateModels(db *gorm.DB) {
 	// First, migrate models without foreign key constraints
 	log.Println("📋 Step 1: Migrating base models...")
 	baseModels := []interface{}{
-		&models.User{},        
-		&models.Product{},     
-		&models.RawMaterial{}, 
+		&models.User{},
+		&models.Product{},
+		&models.RawMaterial{},
 		&models.Transaction{},
 		&models.AuditLog{},
 	}
@@ -115,8 +115,8 @@ func migrateModels(db *gorm.DB) {
 	// Now migrate models with foreign key constraints
 	log.Println("🔗 Step 3: Migrating models with foreign keys...")
 	relationModels := []interface{}{
-		&models.Recipe{},      
-		&models.TransactionDetail{}, 
+		&models.Recipe{},
+		&models.TransactionDetail{},
 	}
 
 	for _, model := range relationModels {
@@ -130,7 +130,7 @@ func migrateModels(db *gorm.DB) {
 
 	// Add custom indexes and constraints
 	addCustomConstraints(db)
-	
+
 	log.Println("✅ Database migration completed")
 }
 
@@ -172,7 +172,7 @@ func seedDefaultUsers(db *gorm.DB) {
 	// Check if users already exist
 	var userCount int64
 	db.Model(&models.User{}).Count(&userCount)
-	
+
 	if userCount > 0 {
 		log.Println("👥 Users already exist, skipping seeder")
 		return
@@ -193,7 +193,7 @@ func seedDefaultUsers(db *gorm.DB) {
 		},
 		{
 			Username: "kasir",
-			Password: string(cashierHash), 
+			Password: string(cashierHash),
 			FullName: "Kasir",
 			Role:     "cashier",
 			IsActive: true,
@@ -214,7 +214,7 @@ func seedDefaultData(db *gorm.DB) {
 	var materialCount, productCount int64
 	db.Model(&models.RawMaterial{}).Count(&materialCount)
 	db.Model(&models.Product{}).Count(&productCount)
-	
+
 	if materialCount > 0 && productCount > 0 {
 		log.Println("📦 Default data already exists, skipping seeder")
 		return

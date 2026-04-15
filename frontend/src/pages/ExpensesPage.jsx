@@ -205,7 +205,7 @@ const ExpensesPage = () => {
               start_date: new Date().toISOString().split('T')[0],
               end_date: new Date().toISOString().split('T')[0]
             })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
           >
             Hari Ini
           </button>
@@ -214,7 +214,7 @@ const ExpensesPage = () => {
               start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               end_date: new Date().toISOString().split('T')[0]
             })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
           >
             7 Hari
           </button>
@@ -223,7 +223,7 @@ const ExpensesPage = () => {
               start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               end_date: new Date().toISOString().split('T')[0]
             })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
           >
             30 Hari
           </button>
@@ -236,7 +236,7 @@ const ExpensesPage = () => {
                 end_date: new Date().toISOString().split('T')[0]
               });
             }}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
           >
             Bulan Ini
           </button>
@@ -249,8 +249,8 @@ const ExpensesPage = () => {
           <h3 className="font-semibold text-gray-900 mb-4">Breakdown per Kategori</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Object.entries(summary.by_category).map(([category, amount]) => (
-              <div key={category} className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">{category}</p>
+              <div key={category} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{category}</p>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(amount)}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {((amount / summary.total_amount) * 100).toFixed(1)}%
@@ -283,7 +283,7 @@ const ExpensesPage = () => {
                 </tr>
               ) : (
                 expenses.map((expense) => (
-                  <tr key={expense.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={expense.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="py-3 px-4 text-gray-900 dark:text-white">
                       {new Date(expense.date).toLocaleDateString('id-ID')}
                     </td>
@@ -300,13 +300,13 @@ const ExpensesPage = () => {
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => handleEdit(expense)}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
                         >
-                          <Edit className="w-4 h-4 text-gray-600" />
+                          <Edit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                         </button>
                         <button
                           onClick={() => handleDelete(expense.id)}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
                         >
                           <Trash2 className="w-4 h-4 text-red-600" />
                         </button>
@@ -328,13 +328,13 @@ const ExpensesPage = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
               {editingExpense ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tanggal</label>
                 <input
                   type="date"
                   value={formData.date}
@@ -344,7 +344,7 @@ const ExpensesPage = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kategori</label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -358,7 +358,7 @@ const ExpensesPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Keterangan</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -369,7 +369,7 @@ const ExpensesPage = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Jumlah (Rp)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -389,7 +389,7 @@ const ExpensesPage = () => {
                     setEditingExpense(null);
                     setFormData({ date: new Date().toISOString().split('T')[0], category: '', description: '', amount: '' });
                   }}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 >
                   Batal
                 </button>

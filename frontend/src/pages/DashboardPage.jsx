@@ -5,7 +5,7 @@ import { formatCurrency } from '../utils/helpers';
 import LowStockAlert from '../components/LowStockAlert';
 import { 
   TrendingUp, 
-  DollarSign, 
+  Banknote, 
   Package, 
   AlertTriangle,
   ShoppingCart,
@@ -52,7 +52,7 @@ const DashboardPage = () => {
     {
       title: 'Total Penjualan Hari Ini',
       value: formatCurrency(summary?.today_sales || 0),
-      icon: DollarSign,
+      icon: Banknote,
       color: 'bg-green-500',
       change: '+12%'
     },
