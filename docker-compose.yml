@@ -1,0 +1,42 @@
+# version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pos_umkm_backend-app
+    ports:
+      - "${SERVER_PORT:-8090}:${SERVER_PORT:-8090}"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - pos_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pos_umkm_frontend-app
+    ports:
+      - "${FRONTEND_PORT:-3015}:80"
+    depends_on:
+      - backend
+    networks:
+      - pos_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
+networks:
+  pos_network:
+    driver: bridge
