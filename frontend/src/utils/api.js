@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -56,7 +56,7 @@ api.interceptors.response.use(
 
 // Auth API (uses different base URL - no /api prefix)
 export const authAPI = {
-  login: (credentials) => axios.post('http://localhost:8080/login', credentials),
+  login: (credentials) => axios.post('/login', credentials),
 };
 
 // Products API
