@@ -47,15 +47,15 @@ const ReportsPage = () => {
 
   useEffect(() => {
     fetchData();
-    
-    // Auto refresh every 30 seconds for today's data
-    const interval = setInterval(() => {
-      const today = new Date().toISOString().split('T')[0];
-      fetchDailyReport(today);
-    }, 30000);
-    
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'daily') return;
+    const interval = setInterval(() => {
+      fetchDailyReport(new Date().toISOString().split('T')[0]);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   const fetchData = async () => {
     try {
@@ -165,11 +165,12 @@ const ReportsPage = () => {
       const matchesSearch = transaction.id.toString().includes(searchTerm) ||
                            transaction.cashier_name?.toLowerCase().includes(searchTerm.toLowerCase());
       const txDate = new Date(transaction.created_at).toISOString().split('T')[0];
-      const matchesDateRange = (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
-      const matchesDateFilter = !dateFilter || transaction.created_at.startsWith(dateFilter);
+      const matchesDate = dateFilter
+        ? transaction.created_at.startsWith(dateFilter)
+        : (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
       const matchesCashier = !cashierFilter || transaction.cashier_name === cashierFilter;
       const matchesPayment = !paymentFilter || transaction.payment_method === paymentFilter;
-      return matchesSearch && (matchesDateRange || matchesDateFilter) && matchesCashier && matchesPayment;
+      return matchesSearch && matchesDate && matchesCashier && matchesPayment;
     });
     
     const startIndex = (currentPage - 1) * itemsPerPage;

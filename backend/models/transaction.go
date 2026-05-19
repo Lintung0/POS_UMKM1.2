@@ -65,10 +65,11 @@ type SalesReport struct {
 }
 
 type TopProduct struct {
-	Date             string  `json:"date"`
-    TotalSales       float64 `json:"total_sales"`
-    TotalProfit      float64 `json:"total_profit"`
-    TransactionCount int     `json:"transaction_count"`
+	ProductID   uint    `json:"product_id"`
+	ProductName string  `json:"product_name"`
+	TotalSold   int     `json:"total_sold"`
+	TotalAmount float64 `json:"total_amount"`
+	TotalProfit float64 `json:"total_profit"`
 }
 
 type DailyReport struct {

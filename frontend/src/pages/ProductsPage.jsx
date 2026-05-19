@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import RecipesPage from './RecipesPage';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { usePageRefresh } from '../utils/hooks';
 import Pagination from '../components/Pagination';
 
 const ProductsPage = () => {
@@ -43,49 +44,6 @@ const ProductsPage = () => {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
-  useEffect(() => {
-    fetchProducts();
-    
-    // Auto refresh when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchProducts();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  // Check authentication before any operation
-  const checkAuth = () => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    console.log('Auth check:', {
-      isAuthenticated,
-      hasToken: !!token,
-      hasUser: !!userData,
-      userRole: user?.role
-    });
-    
-    if (!isAuthenticated || !token || !userData) {
-      toast.error('Sesi login telah berakhir. Silakan login kembali.');
-      window.location.href = '/login';
-      return false;
-    }
-    
-    if (user?.role !== 'admin') {
-      toast.error('Akses ditolak. Hanya admin yang dapat mengelola produk.');
-      return false;
-    }
-    
-    return true;
-  };
-
   const fetchProducts = async () => {
     try {
       const response = await productsAPI.getAll();
@@ -95,6 +53,24 @@ const ProductsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  usePageRefresh(fetchProducts);
+
+  // Check authentication before any operation
+  const checkAuth = () => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    if (!isAuthenticated || !token || !userData) {
+      toast.error('Sesi login telah berakhir. Silakan login kembali.');
+      window.location.href = '/login';
+      return false;
+    }
+    if (user?.role !== 'admin') {
+      toast.error('Akses ditolak. Hanya admin yang dapat mengelola produk.');
+      return false;
+    }
+    return true;
   };
 
   // Filter and paginate products
@@ -128,10 +104,6 @@ const ProductsPage = () => {
         image: formData.image
       };
 
-      console.log('Submitting product data:', data);
-      console.log('Current token:', localStorage.getItem('token')?.substring(0, 20) + '...');
-      console.log('Current user:', user);
-
       if (editingProduct) {
         await productsAPI.update(editingProduct.id, data);
         toast.success('Produk berhasil diperbarui');
@@ -146,14 +118,8 @@ const ProductsPage = () => {
       setImagePreview(null);
       fetchProducts();
     } catch (error) {
-      console.error('Product submission error:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error message:', error.response?.data?.message);
-      
       if (error.response?.status === 401) {
         toast.error('Sesi login telah berakhir. Silakan login kembali.');
-        // Don't redirect here, let the interceptor handle it
       } else if (error.response?.status === 403) {
         toast.error('Akses ditolak. Hanya admin yang dapat mengelola produk.');
       } else {

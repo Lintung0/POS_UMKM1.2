@@ -132,4 +132,12 @@ export const settingsAPI = {
   update: (data) => api.put('/settings', data),
 };
 
+// Productions API
+export const productionsAPI = {
+  getAll: (params = {}) => api.get('/productions', { params: { ...params, _t: Date.now() } }),
+  produce: (data) => api.post('/productions', data),
+  calculateCost: (id) => api.post(`/production/calculate-cost/${id}`),
+  maxProduction: (id) => api.post(`/production/max-production/${id}`),
+};
+
 export default api;

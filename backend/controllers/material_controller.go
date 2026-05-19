@@ -256,8 +256,8 @@ func (mc *MaterialController) RestockMaterial(c *gin.Context) {
     oldStock := material.Stock
     newStock := oldStock + request.Quantity
     
-    // Update stock
-    result = config.DB.Model(&material).Update("stock", newStock)
+    // Update stock atomically to prevent race condition
+    result = config.DB.Model(&material).Update("stock", gorm.Expr("stock + ?", request.Quantity))
     if result.Error != nil {
         response := utils.ErrorResponse("Gagal menambah stok", result.Error)
         c.JSON(http.StatusInternalServerError, response)

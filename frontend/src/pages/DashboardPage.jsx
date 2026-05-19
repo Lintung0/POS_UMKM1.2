@@ -54,28 +54,24 @@ const DashboardPage = () => {
       value: formatCurrency(summary?.today_sales || 0),
       icon: Banknote,
       color: 'bg-green-500',
-      change: '+12%'
     },
     {
       title: 'Keuntungan Hari Ini',
       value: formatCurrency(summary?.today_profit || 0),
       icon: TrendingUp,
       color: 'bg-blue-500',
-      change: '+8%'
     },
     {
       title: 'Total Produk',
       value: summary?.total_products || 0,
       icon: Package,
       color: 'bg-purple-500',
-      change: '+2'
     },
     {
       title: 'Stok Rendah',
       value: summary?.low_stock_count || 0,
       icon: AlertTriangle,
       color: 'bg-orange-500',
-      change: '-1'
     }
   ];
 
@@ -105,7 +101,6 @@ const DashboardPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stat.value}</p>
-                <p className="text-sm text-green-600 mt-1">{stat.change} dari kemarin</p>
               </div>
               <div className={`${stat.color} p-3 rounded-lg`}>
                 <stat.icon className="w-6 h-6 text-white" />

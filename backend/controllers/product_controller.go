@@ -215,20 +215,40 @@ func (pc *ProductController) DeleteProduct(c *gin.Context) {
         c.JSON(http.StatusBadRequest, response)
         return
     }
-    
+
+    tx := config.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
     // Delete related recipes first
-    config.DB.Where("product_id = ?", id).Delete(&models.Recipe{})
-    
-    result := config.DB.Delete(&models.Product{}, id)
+    if err := tx.Where("product_id = ?", id).Delete(&models.Recipe{}).Error; err != nil {
+        tx.Rollback()
+        response := utils.ErrorResponse("Gagal menghapus resep terkait", err)
+        c.JSON(http.StatusInternalServerError, response)
+        return
+    }
+
+    result := tx.Delete(&models.Product{}, id)
     if result.Error != nil {
+        tx.Rollback()
         response := utils.ErrorResponse("Gagal menghapus produk", result.Error)
         c.JSON(http.StatusInternalServerError, response)
         return
     }
     
     if result.RowsAffected == 0 {
+        tx.Rollback()
         response := utils.ErrorResponse("Produk tidak ditemukan", nil)
         c.JSON(http.StatusNotFound, response)
+        return
+    }
+
+    if err := tx.Commit().Error; err != nil {
+        response := utils.ErrorResponse("Gagal menghapus produk", err)
+        c.JSON(http.StatusInternalServerError, response)
         return
     }
     

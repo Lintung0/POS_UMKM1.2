@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { expensesAPI } from '../utils/api';
 import { formatCurrency } from '../utils/helpers';
-import { Plus, Edit, Trash2, DollarSign, Search, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '../components/Pagination';
+import DateRangeFilter from '../components/DateRangeFilter';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const ExpensesPage = () => {
   const [expenses, setExpenses] = useState([]);
@@ -11,6 +13,7 @@ const ExpensesPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 15;
@@ -114,15 +117,17 @@ const ExpensesPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Yakin ingin menghapus pengeluaran ini?')) {
-      try {
-        await expensesAPI.delete(id);
-        toast.success('Pengeluaran berhasil dihapus');
-        fetchExpenses();
-        fetchSummary();
-      } catch (error) {
-        toast.error('Gagal menghapus pengeluaran');
-      }
+    setDeleteConfirm({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await expensesAPI.delete(deleteConfirm.id);
+      toast.success('Pengeluaran berhasil dihapus');
+      fetchExpenses();
+      fetchSummary();
+    } catch (error) {
+      toast.error('Gagal menghapus pengeluaran');
     }
   };
 
@@ -165,81 +170,19 @@ const ExpensesPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="card">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Mulai</label>
+      <div className="space-y-4">
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <div className="card">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
-              type="date"
-              value={dateRange.start_date}
-              onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
-              className="input"
+              type="text"
+              placeholder="Cari keterangan atau kategori..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input pl-10"
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Akhir</label>
-            <input
-              type="date"
-              value={dateRange.end_date}
-              onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
-              className="input"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cari</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cari keterangan atau kategori..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input pl-10"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date().toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
-          >
-            Hari Ini
-          </button>
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
-          >
-            7 Hari
-          </button>
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
-          >
-            30 Hari
-          </button>
-          <button
-            onClick={() => {
-              const now = new Date();
-              const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-              setDateRange({
-                start_date: firstDay.toISOString().split('T')[0],
-                end_date: new Date().toISOString().split('T')[0]
-              });
-            }}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 rounded-lg"
-          >
-            Bulan Ini
-          </button>
         </div>
       </div>
 
@@ -401,6 +344,14 @@ const ExpensesPage = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        title="Hapus Pengeluaran"
+        message="Yakin ingin menghapus pengeluaran ini?"
+        type="danger"
+      />
     </div>
   );
 };

@@ -207,6 +207,8 @@ func SetupRouter() *gin.Engine {
 		transactionCtrl := &controllers.TransactionController{}
 		laporan.GET("/harian", transactionCtrl.GetDailyReport)
 		laporan.GET("/bulanan", transactionCtrl.GetMonthlyReport)
+		laporan.GET("/perbandingan-periode", transactionCtrl.GetPeriodComparison)
+		laporan.GET("/jam-sibuk", transactionCtrl.GetPeakHours)
 
 		dashboardCtrl := &controllers.DashboardController{}
 		laporan.GET("/ringkasan", dashboardCtrl.GetDashboardSummary)
@@ -222,6 +224,11 @@ func SetupRouter() *gin.Engine {
 		expenseCtrl := &controllers.ExpenseController{}
 		laporan.GET("/pengeluaran", expenseCtrl.GetAllExpenses)
 		laporan.GET("/pengeluaran/ringkasan", expenseCtrl.GetExpenseSummary)
+
+		reportCtrl := &controllers.ReportController{}
+		laporan.GET("/export/harian", reportCtrl.ExportDailyReportCSV)
+		laporan.GET("/export/bulanan", reportCtrl.ExportMonthlyReportCSV)
+		laporan.GET("/export/semua", reportCtrl.ExportAllTransactionsCSV)
 	}
 
 	// PRODUKSI Routes - untuk production management

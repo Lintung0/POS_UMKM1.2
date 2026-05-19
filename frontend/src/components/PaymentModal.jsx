@@ -3,7 +3,6 @@ import { transactionsAPI } from '../utils/api';
 import { formatCurrency } from '../utils/helpers';
 import { X, CreditCard, Banknote, Calculator } from 'lucide-react';
 import toast from 'react-hot-toast';
-import ReceiptModal from './ReceiptModal';
 
 const PaymentModal = ({ isOpen, onClose, cartItems, totalAmount, onSuccess }) => {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -11,8 +10,6 @@ const PaymentModal = ({ isOpen, onClose, cartItems, totalAmount, onSuccess }) =>
   const [cashierName, setCashierName] = useState('Kasir UMKM');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [transactionData, setTransactionData] = useState(null);
 
   if (!isOpen) return null;
 
@@ -40,12 +37,8 @@ const PaymentModal = ({ isOpen, onClose, cartItems, totalAmount, onSuccess }) =>
 
       const response = await transactionsAPI.create(requestData);
       
-      // Set transaction data and show receipt
-      setTransactionData(response.data.data.transaction);
-      setShowReceipt(true);
-      
       toast.success('Transaksi berhasil!');
-      onSuccess();
+      onSuccess(response.data.data.transaction);
       onClose();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Transaksi gagal');
@@ -228,13 +221,6 @@ const PaymentModal = ({ isOpen, onClose, cartItems, totalAmount, onSuccess }) =>
           </div>
         </div>
       </div>
-
-      {/* Receipt Modal */}
-      <ReceiptModal
-        isOpen={showReceipt}
-        onClose={() => setShowReceipt(false)}
-        transaction={transactionData}
-      />
     </div>
   );
 };

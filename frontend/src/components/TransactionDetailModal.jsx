@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { transactionsAPI } from '../utils/api';
 import { formatCurrency } from '../utils/helpers';
-import { X, Receipt, Calendar, User, CreditCard } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { X, Calendar, User, CreditCard, Receipt } from 'lucide-react';
 
 const TransactionDetailModal = ({ transactionId, onClose }) => {
   const [transaction, setTransaction] = useState(null);
@@ -20,16 +19,6 @@ const TransactionDetailModal = ({ transactionId, onClose }) => {
       toast.error('Gagal memuat detail transaksi');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handlePrintReceipt = async () => {
-    try {
-      const response = await transactionsAPI.getReceipt(transactionId);
-      // In a real app, this would trigger a print dialog or PDF generation
-      toast.success('Struk siap dicetak');
-    } catch (error) {
-      toast.error('Gagal mencetak struk');
     }
   };
 
@@ -155,16 +144,7 @@ const TransactionDetailModal = ({ transactionId, onClose }) => {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={handlePrintReceipt}
-              className="btn btn-primary flex items-center space-x-2"
-            >
-              <Receipt className="w-4 h-4" />
-              <span>Cetak Struk</span>
-            </button>
-          </div>
+
         </div>
       </div>
     </div>

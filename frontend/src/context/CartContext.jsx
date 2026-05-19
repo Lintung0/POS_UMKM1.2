@@ -49,6 +49,10 @@ export const CartProvider = ({ children }) => {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
 
   const addItem = (product) => {
+    const maxStock = product.has_recipe ? (product.available_stock ?? 0) : product.stock;
+    const existing = state.items.find(item => item.id === product.id);
+    const currentQty = existing ? existing.quantity : 0;
+    if (currentQty >= maxStock) return;
     dispatch({ type: 'ADD_ITEM', payload: product });
   };
 
@@ -60,6 +64,11 @@ export const CartProvider = ({ children }) => {
     if (quantity <= 0) {
       removeItem(productId);
     } else {
+      const product = state.items.find(item => item.id === productId);
+      if (product) {
+        const maxStock = product.has_recipe ? (product.available_stock ?? 0) : product.stock;
+        if (quantity > maxStock) return;
+      }
       dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity } });
     }
   };

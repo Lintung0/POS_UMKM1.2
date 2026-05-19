@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Banknote, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, Banknote, BarChart3 } from 'lucide-react';
 import { profitAPI } from '../utils/api';
+import { formatCurrency } from '../utils/helpers';
+import DateRangeFilter from '../components/DateRangeFilter';
 import toast from 'react-hot-toast';
 
 const ProfitAnalysis = () => {
@@ -38,14 +40,6 @@ const ProfitAnalysis = () => {
     fetchProfitData();
   }, [dateRange]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
   const formatPercent = (percent) => {
     return `${percent.toFixed(1)}%`;
   };
@@ -65,84 +59,7 @@ const ProfitAnalysis = () => {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analisis Keuntungan</h1>
       </div>
 
-      {/* Date Range Filter */}
-      <div className="card">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Mulai</label>
-            <input
-              type="date"
-              value={dateRange.start_date}
-              onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
-              className="input"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Akhir</label>
-            <input
-              type="date"
-              value={dateRange.end_date}
-              onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
-              className="input"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date().toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
-          >
-            Hari Ini
-          </button>
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
-          >
-            7 Hari
-          </button>
-          <button
-            onClick={() => setDateRange({
-              start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              end_date: new Date().toISOString().split('T')[0]
-            })}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
-          >
-            30 Hari
-          </button>
-          <button
-            onClick={() => {
-              const now = new Date();
-              const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-              setDateRange({
-                start_date: firstDay.toISOString().split('T')[0],
-                end_date: new Date().toISOString().split('T')[0]
-              });
-            }}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
-          >
-            Bulan Ini
-          </button>
-          <button
-            onClick={() => {
-              const now = new Date();
-              const firstDay = new Date(now.getFullYear(), 0, 1);
-              setDateRange({
-                start_date: firstDay.toISOString().split('T')[0],
-                end_date: new Date().toISOString().split('T')[0]
-              });
-            }}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"
-          >
-            Tahun Ini
-          </button>
-        </div>
-      </div>
+      <DateRangeFilter value={dateRange} onChange={setDateRange} showYear />
 
       {/* Summary Cards */}
       {profitSummary && (

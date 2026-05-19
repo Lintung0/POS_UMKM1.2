@@ -145,7 +145,7 @@ func (ec *ExpenseController) CreateExpense(c *gin.Context) {
 		Category:    request.Category,
 		Description: request.Description,
 		Amount:      request.Amount,
-		CreatedBy:   "admin", // TODO: Get from auth context
+		CreatedBy:   c.GetString("username"),
 	}
 
 	result := config.DB.Create(&expense)

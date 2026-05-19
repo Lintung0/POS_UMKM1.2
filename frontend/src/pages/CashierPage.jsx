@@ -10,10 +10,13 @@ import {
   Receipt,
   Search,
   Filter,
-  Package
+  Package,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PaymentModal from '../components/PaymentModal';
+import { usePageRefresh } from '../utils/hooks';
+import ReceiptModal from '../components/ReceiptModal';
 
 const CashierPage = () => {
   const [products, setProducts] = useState([]);
@@ -21,25 +24,10 @@ const CashierPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState(null);
   
   const { items, addItem, updateQuantity, removeItem, getTotalAmount, getTotalItems, clearCart } = useCart();
-
-  useEffect(() => {
-    fetchProducts();
-    
-    // Auto refresh when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchProducts();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
 
   const fetchProducts = async () => {
     try {
@@ -52,6 +40,8 @@ const CashierPage = () => {
     }
   };
 
+  usePageRefresh(fetchProducts);
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || product.category === selectedCategory;
@@ -61,7 +51,7 @@ const CashierPage = () => {
   const categories = [...new Set(products.map(p => p.category))];
 
   const handleAddToCart = (product) => {
-    const displayStock = product.has_recipe ? product.available_stock : product.stock;
+    const displayStock = product.has_recipe ? (product.available_stock ?? 0) : product.stock;
     
     if (displayStock <= 0) {
       toast.error('Stok produk habis');
@@ -149,7 +139,7 @@ const CashierPage = () => {
         {/* Products Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[calc(100vh-200px)] overflow-y-auto">
           {filteredProducts.map(product => {
-            const displayStock = product.has_recipe ? product.available_stock : product.stock;
+        const displayStock = product.has_recipe ? (product.available_stock ?? 0) : product.stock;
             const isLowStock = displayStock > 0 && displayStock <= 10;
             
             return (
@@ -281,14 +271,22 @@ const CashierPage = () => {
           onClose={() => setShowPaymentModal(false)}
           cartItems={items}
           totalAmount={getTotalAmount()}
-          onSuccess={() => {
+          onSuccess={(transaction) => {
             clearCart();
             setShowPaymentModal(false);
-            fetchProducts(); // Refresh products to update stock
-            toast.success('Transaksi berhasil!');
+            fetchProducts();
+            setLastTransaction(transaction);
+            setShowReceiptModal(true);
           }}
         />
       )}
+
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        transaction={lastTransaction}
+      />
     </div>
   );
 };

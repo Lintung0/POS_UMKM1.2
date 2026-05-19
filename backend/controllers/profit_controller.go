@@ -118,28 +118,15 @@ func GetProfitSummary(c *gin.Context) {
 		return
 	}
 
-	// Load all products once and create a map for fast lookup
-	var products []models.Product
-	config.DB.Find(&products)
-	productMap := make(map[string]float64)
-	for _, p := range products {
-		productMap[p.Name] = p.CostPrice
-	}
-
-	var totalRevenue, totalCost float64
+	var totalRevenue, totalProfit float64
 	transactionCount := len(transactions)
 
 	for _, transaction := range transactions {
 		totalRevenue += transaction.TotalAmount
-		
-		for _, detail := range transaction.Details {
-			if costPrice, exists := productMap[detail.ProductName]; exists {
-				totalCost += costPrice * float64(detail.Qty)
-			}
-		}
+		totalProfit += transaction.TotalProfit
 	}
 
-	totalProfit := totalRevenue - totalCost
+	totalCost := totalRevenue - totalProfit
 	profitMargin := 0.0
 	if totalRevenue > 0 {
 		profitMargin = (totalProfit / totalRevenue) * 100
@@ -212,44 +199,31 @@ func GetProductProfitAnalysis(c *gin.Context) {
 
 func GetDailyProfitTrend(c *gin.Context) {
 	type DailyProfit struct {
-		Date   string  `json:"date"`
+		Date    string  `json:"date"`
 		Revenue float64 `json:"revenue"`
 		Cost    float64 `json:"cost"`
 		Profit  float64 `json:"profit"`
 	}
 
-	// Load all products once
-	var products []models.Product
-	config.DB.Find(&products)
-	productMap := make(map[string]float64)
-	for _, p := range products {
-		productMap[p.Name] = p.CostPrice
-	}
-
 	var result []DailyProfit
-	
+
 	for i := 0; i < 7; i++ {
 		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
-		
+
 		var transactions []models.Transaction
-		config.DB.Preload("Details").Where("DATE(created_at) = ?", date).Find(&transactions)
-		
-		var dayRevenue, dayCost float64
+		config.DB.Where("DATE(created_at) = ?", date).Find(&transactions)
+
+		var dayRevenue, dayProfit float64
 		for _, transaction := range transactions {
 			dayRevenue += transaction.TotalAmount
-			
-			for _, detail := range transaction.Details {
-				if costPrice, exists := productMap[detail.ProductName]; exists {
-					dayCost += costPrice * float64(detail.Qty)
-				}
-			}
+			dayProfit += transaction.TotalProfit
 		}
-		
+
 		result = append(result, DailyProfit{
 			Date:    date,
 			Revenue: dayRevenue,
-			Cost:    dayCost,
-			Profit:  dayRevenue - dayCost,
+			Cost:    dayRevenue - dayProfit,
+			Profit:  dayProfit,
 		})
 	}
 
