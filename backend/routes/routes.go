@@ -69,16 +69,16 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// CORS configuration
+	// AllowAllOrigins=true is required so non-browser clients (e.g. C# desktop
+	// apps) that do not send an Origin header are never rejected by the
+	// preflight/origin check. AllowCredentials must stay false when using
+	// AllowAllOrigins (browser security requirement).
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
-			"http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://localhost:3005", "http://localhost:3006", "http://localhost:3007",
-			"http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002", "http://127.0.0.1:3003", "http://127.0.0.1:3004", "http://127.0.0.1:3005", "http://127.0.0.1:3006", "http://127.0.0.1:3007",
-			"https://posumkm.busines.biz.id", "http://posumkm.busines.biz.id",
-		},
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Requested-With", "Accept"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Type"},
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -101,31 +101,24 @@ func SetupRouter() *gin.Engine {
 		}
 	})
 
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":    "healthy",
-			"service":   "POS UMKM API",
-			"version":   "1.0.0",
-			"timestamp": time.Now().Format(time.RFC3339),
-		})
-	})
-
-	// Auth routes (no prefix)
-	r.POST("/login", func(c *gin.Context) {
+	// loginHandler is used by /api/login.
+	// ShouldBind (not ShouldBindJSON) accepts JSON, form-urlencoded AND
+	// multipart — so both the web frontend and the C# desktop app work
+	// regardless of which Content-Type they send.
+	loginHandler := func(c *gin.Context) {
 		var req models.LoginRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, utils.ErrorResponse("Invalid request", err))
+		if err := c.ShouldBind(&req); err != nil {
+			c.JSON(400, utils.ErrorResponse("Invalid request: username dan password wajib diisi", err))
 			return
 		}
 
 		var user models.User
-		if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		if err := config.DB.Where("username = ? AND is_active = ?", req.Username, true).First(&user).Error; err != nil {
 			c.JSON(401, utils.ErrorResponse("Username atau password salah", nil))
 			return
 		}
 
-		// Check password with bcrypt
+		// Verify password
 		if !utils.CheckPasswordHash(req.Password, user.Password) {
 			c.JSON(401, utils.ErrorResponse("Username atau password salah", nil))
 			return
@@ -138,175 +131,187 @@ func SetupRouter() *gin.Engine {
 			return
 		}
 
-		// Update last login
-		config.DB.Model(&user).Update("last_login", time.Now())
+		// Update last login (use raw SQL update to bypass BeforeSave hook)
+		config.DB.Exec("UPDATE users SET last_login = ? WHERE id = ?", time.Now(), user.ID)
 
-		response := utils.SuccessResponse("Login berhasil", gin.H{
+		c.JSON(200, utils.SuccessResponse("Login berhasil", gin.H{
 			"id":       user.ID,
 			"username": user.Username,
 			"name":     user.FullName,
 			"role":     user.Role,
 			"token":    token,
-		})
-		c.JSON(200, response)
-	})
-
-	// KASIR Routes - untuk transaksi penjualan
-	kasir := r.Group("/kasir")
-	{
-		transactionCtrl := &controllers.TransactionController{}
-		kasir.POST("/transaksi", transactionCtrl.CreateTransaction)
-		kasir.GET("/transaksi", transactionCtrl.GetAllTransactions)
-		kasir.GET("/transaksi/:id", transactionCtrl.GetTransactionByID)
-		kasir.GET("/transaksi/:id/struk", func(c *gin.Context) {
-			id := c.Param("id")
-
-			var transaction models.Transaction
-			if err := config.DB.First(&transaction, id).Error; err != nil {
-				c.JSON(404, utils.ErrorResponse("Transaksi tidak ditemukan", err))
-				return
-			}
-
-			var details []models.TransactionDetail
-			config.DB.Where("transaction_id = ?", id).Find(&details)
-
-			receipt := gin.H{
-				"transaction":   transaction,
-				"details":       details,
-				"store_name":    "UMKM Store",
-				"store_address": "Jl. Contoh No. 123",
-				"print_time":    time.Now().Format("2006-01-02 15:04:05"),
-			}
-
-			response := utils.SuccessResponse("Receipt generated", receipt)
-			c.JSON(200, response)
-		})
-
-		kasir.GET("/transaksi/:id/struk/print", func(c *gin.Context) {
-			id := c.Param("id")
-
-			var transaction models.Transaction
-			if err := config.DB.First(&transaction, id).Error; err != nil {
-				c.String(404, "Transaksi tidak ditemukan")
-				return
-			}
-
-			var details []models.TransactionDetail
-			config.DB.Where("transaction_id = ?", id).Find(&details)
-
-			html := generateReceiptHTML(transaction, details)
-			c.Header("Content-Type", "text/html; charset=utf-8")
-			c.String(200, html)
-		})
-
-		// Product list untuk kasir
-		productCtrl := &controllers.ProductController{}
-		kasir.GET("/produk", productCtrl.GetAllProducts)
-		kasir.GET("/produk/:id", productCtrl.GetProductByID)
+		}))
 	}
 
-	// LAPORAN Routes - untuk reporting
-	laporan := r.Group("/laporan")
-	{
-		transactionCtrl := &controllers.TransactionController{}
-		laporan.GET("/harian", transactionCtrl.GetDailyReport)
-		laporan.GET("/bulanan", transactionCtrl.GetMonthlyReport)
-		laporan.GET("/perbandingan-periode", transactionCtrl.GetPeriodComparison)
-		laporan.GET("/jam-sibuk", transactionCtrl.GetPeakHours)
-
-		dashboardCtrl := &controllers.DashboardController{}
-		laporan.GET("/ringkasan", dashboardCtrl.GetDashboardSummary)
-		laporan.GET("/produk-terlaris", dashboardCtrl.GetTopProducts)
-		laporan.GET("/tren-penjualan", dashboardCtrl.GetSalesTrend)
-
-		profitCtrl := &controllers.ProfitController{}
-		laporan.GET("/laba-rugi", profitCtrl.GetProfitSummary)
-		laporan.GET("/analisis-produk", profitCtrl.GetProductProfitAnalysis)
-		laporan.GET("/tren-laba", profitCtrl.GetDailyProfitTrend)
-		laporan.GET("/analisis-lengkap", profitCtrl.GetProfitAnalysis)
-
-		expenseCtrl := &controllers.ExpenseController{}
-		laporan.GET("/pengeluaran", expenseCtrl.GetAllExpenses)
-		laporan.GET("/pengeluaran/ringkasan", expenseCtrl.GetExpenseSummary)
-
-		reportCtrl := &controllers.ReportController{}
-		laporan.GET("/export/harian", reportCtrl.ExportDailyReportCSV)
-		laporan.GET("/export/bulanan", reportCtrl.ExportMonthlyReportCSV)
-		laporan.GET("/export/semua", reportCtrl.ExportAllTransactionsCSV)
-	}
-
-	// PRODUKSI Routes - untuk production management
-	produksi := r.Group("/produksi", utils.AuthMiddleware(), utils.AdminOnly())
-	{
-		productionCtrl := &controllers.ProductionController{}
-		produksi.GET("", productionCtrl.GetAllProductions)
-		produksi.POST("", productionCtrl.ProduceProduct)
-		produksi.POST("/hitung-biaya/:id", productionCtrl.CalculateProductCost)
-		produksi.GET("/stok-maksimal/:id", productionCtrl.CalculateMaxProduction)
-
-		// Recipe management
-		recipeCtrl := &controllers.RecipeController{}
-		produksi.GET("/resep/:product_id", recipeCtrl.GetRecipesByProduct)
-		produksi.POST("/resep", recipeCtrl.SaveRecipes)
-		produksi.DELETE("/resep/:id", recipeCtrl.DeleteRecipe)
-	}
-
-	// PRODUK Routes - untuk product management
-	produk := r.Group("/produk")
-	{
-		productCtrl := &controllers.ProductController{}
-		produk.GET("", productCtrl.GetAllProducts)
-		produk.GET("/:id", productCtrl.GetProductByID)
-		produk.GET("/:id/resep", productCtrl.GetProductRecipes)
-
-		// Admin only
-		adminProduk := produk.Group("", utils.AuthMiddleware(), utils.AdminOnly())
-		{
-			adminProduk.POST("", productCtrl.CreateProduct)
-			adminProduk.PUT("/:id", productCtrl.UpdateProduct)
-			adminProduk.DELETE("/:id", productCtrl.DeleteProduct)
-		}
-	}
-
-	// BAHAN-BAKU Routes - untuk material management
-	bahanBaku := r.Group("/bahan-baku")
-	{
-		materialCtrl := &controllers.MaterialController{}
-		bahanBaku.GET("", materialCtrl.GetAllMaterials)
-		bahanBaku.GET("/stok-menipis", materialCtrl.GetLowStockMaterials)
-
-		// Admin only
-		adminBahan := bahanBaku.Group("", utils.AuthMiddleware(), utils.AdminOnly())
-		{
-			adminBahan.POST("", materialCtrl.CreateMaterial)
-			adminBahan.PUT("/:id", materialCtrl.UpdateMaterial)
-			adminBahan.DELETE("/:id", materialCtrl.DeleteMaterial)
-			adminBahan.POST("/:id/restock", materialCtrl.RestockMaterial)
-		}
-	}
-
-	// PENGELUARAN Routes - untuk expense management
-	pengeluaran := r.Group("/pengeluaran", utils.AuthMiddleware())
-	{
-		expenseCtrl := &controllers.ExpenseController{}
-		pengeluaran.GET("", expenseCtrl.GetAllExpenses)
-		pengeluaran.GET("/ringkasan", expenseCtrl.GetExpenseSummary)
-		pengeluaran.POST("", expenseCtrl.CreateExpense)
-		pengeluaran.PUT("/:id", expenseCtrl.UpdateExpense)
-		pengeluaran.DELETE("/:id", expenseCtrl.DeleteExpense)
-	}
-
-	// PENGATURAN Routes - untuk settings
-	pengaturan := r.Group("/pengaturan", utils.AuthMiddleware(), utils.AdminOnly())
-	{
-		settingsCtrl := &controllers.SettingsController{}
-		pengaturan.GET("", settingsCtrl.GetSettings)
-		pengaturan.PUT("", settingsCtrl.UpdateSettings)
-	}
-
-	// Keep old API routes for backward compatibility
+	// Group all API routes strictly under the /api prefix
 	api := r.Group("/api")
 	{
+		// Health check
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"status":    "healthy",
+				"service":   "POS UMKM API",
+				"version":   "1.0.0",
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+		})
+
+		// /api/login alias — C# desktop app may prefix every request with /api
+		api.POST("/login", loginHandler)
+
+		// KASIR Routes - untuk transaksi penjualan
+		kasir := api.Group("/kasir")
+		{
+			transactionCtrl := &controllers.TransactionController{}
+			kasir.POST("/transaksi", transactionCtrl.CreateTransaction)
+			kasir.GET("/transaksi", transactionCtrl.GetAllTransactions)
+			kasir.GET("/transaksi/:id", transactionCtrl.GetTransactionByID)
+			kasir.GET("/transaksi/:id/struk", func(c *gin.Context) {
+				id := c.Param("id")
+
+				var transaction models.Transaction
+				if err := config.DB.First(&transaction, id).Error; err != nil {
+					c.JSON(404, utils.ErrorResponse("Transaksi tidak ditemukan", err))
+					return
+				}
+
+				var details []models.TransactionDetail
+				config.DB.Where("transaction_id = ?", id).Find(&details)
+
+				receipt := gin.H{
+					"transaction":   transaction,
+					"details":       details,
+					"store_name":    "UMKM Store",
+					"store_address": "Jl. Contoh No. 123",
+					"print_time":    time.Now().Format("2006-01-02 15:04:05"),
+				}
+
+				response := utils.SuccessResponse("Receipt generated", receipt)
+				c.JSON(200, response)
+			})
+
+			kasir.GET("/transaksi/:id/struk/print", func(c *gin.Context) {
+				id := c.Param("id")
+
+				var transaction models.Transaction
+				if err := config.DB.First(&transaction, id).Error; err != nil {
+					c.String(404, "Transaksi tidak ditemukan")
+					return
+				}
+
+				var details []models.TransactionDetail
+				config.DB.Where("transaction_id = ?", id).Find(&details)
+
+				html := generateReceiptHTML(transaction, details)
+				c.Header("Content-Type", "text/html; charset=utf-8")
+				c.String(200, html)
+			})
+
+			// Product list untuk kasir
+			productCtrl := &controllers.ProductController{}
+			kasir.GET("/produk", productCtrl.GetAllProducts)
+			kasir.GET("/produk/:id", productCtrl.GetProductByID)
+		}
+
+		// LAPORAN Routes - untuk reporting
+		laporan := api.Group("/laporan")
+		{
+			transactionCtrl := &controllers.TransactionController{}
+			laporan.GET("/harian", transactionCtrl.GetDailyReport)
+			laporan.GET("/bulanan", transactionCtrl.GetMonthlyReport)
+			laporan.GET("/perbandingan-periode", transactionCtrl.GetPeriodComparison)
+			laporan.GET("/jam-sibuk", transactionCtrl.GetPeakHours)
+
+			dashboardCtrl := &controllers.DashboardController{}
+			laporan.GET("/ringkasan", dashboardCtrl.GetDashboardSummary)
+			laporan.GET("/produk-terlaris", dashboardCtrl.GetTopProducts)
+			laporan.GET("/tren-penjualan", dashboardCtrl.GetSalesTrend)
+
+			profitCtrl := &controllers.ProfitController{}
+			laporan.GET("/laba-rugi", profitCtrl.GetProfitSummary)
+			laporan.GET("/analisis-produk", profitCtrl.GetProductProfitAnalysis)
+			laporan.GET("/tren-laba", profitCtrl.GetDailyProfitTrend)
+			laporan.GET("/analisis-lengkap", profitCtrl.GetProfitAnalysis)
+
+			expenseCtrl := &controllers.ExpenseController{}
+			laporan.GET("/pengeluaran", expenseCtrl.GetAllExpenses)
+			laporan.GET("/pengeluaran/ringkasan", expenseCtrl.GetExpenseSummary)
+
+			reportCtrl := &controllers.ReportController{}
+			laporan.GET("/export/harian", reportCtrl.ExportDailyReportCSV)
+			laporan.GET("/export/bulanan", reportCtrl.ExportMonthlyReportCSV)
+			laporan.GET("/export/semua", reportCtrl.ExportAllTransactionsCSV)
+		}
+
+		// PRODUKSI Routes - untuk production management
+		produksi := api.Group("/produksi", utils.AuthMiddleware(), utils.AdminOnly())
+		{
+			productionCtrl := &controllers.ProductionController{}
+			produksi.GET("", productionCtrl.GetAllProductions)
+			produksi.POST("", productionCtrl.ProduceProduct)
+			produksi.POST("/hitung-biaya/:id", productionCtrl.CalculateProductCost)
+			produksi.GET("/stok-maksimal/:id", productionCtrl.CalculateMaxProduction)
+
+			// Recipe management
+			recipeCtrl := &controllers.RecipeController{}
+			produksi.GET("/resep/:product_id", recipeCtrl.GetRecipesByProduct)
+			produksi.POST("/resep", recipeCtrl.SaveRecipes)
+			produksi.DELETE("/resep/:id", recipeCtrl.DeleteRecipe)
+		}
+
+		// PRODUK Routes - untuk product management
+		produk := api.Group("/produk")
+		{
+			productCtrl := &controllers.ProductController{}
+			produk.GET("", productCtrl.GetAllProducts)
+			produk.GET("/:id", productCtrl.GetProductByID)
+			produk.GET("/:id/resep", productCtrl.GetProductRecipes)
+
+			// Admin only
+			adminProduk := produk.Group("", utils.AuthMiddleware(), utils.AdminOnly())
+			{
+				adminProduk.POST("", productCtrl.CreateProduct)
+				adminProduk.PUT("/:id", productCtrl.UpdateProduct)
+				adminProduk.DELETE("/:id", productCtrl.DeleteProduct)
+			}
+		}
+
+		// BAHAN-BAKU Routes - untuk material management
+		bahanBaku := api.Group("/bahan-baku")
+		{
+			materialCtrl := &controllers.MaterialController{}
+			bahanBaku.GET("", materialCtrl.GetAllMaterials)
+			bahanBaku.GET("/stok-menipis", materialCtrl.GetLowStockMaterials)
+
+			// Admin only
+			adminBahan := bahanBaku.Group("", utils.AuthMiddleware(), utils.AdminOnly())
+			{
+				adminBahan.POST("", materialCtrl.CreateMaterial)
+				adminBahan.PUT("/:id", materialCtrl.UpdateMaterial)
+				adminBahan.DELETE("/:id", materialCtrl.DeleteMaterial)
+				adminBahan.POST("/:id/restock", materialCtrl.RestockMaterial)
+			}
+		}
+
+		// PENGELUARAN Routes - untuk expense management
+		pengeluaran := api.Group("/pengeluaran", utils.AuthMiddleware())
+		{
+			expenseCtrl := &controllers.ExpenseController{}
+			pengeluaran.GET("", expenseCtrl.GetAllExpenses)
+			pengeluaran.GET("/ringkasan", expenseCtrl.GetExpenseSummary)
+			pengeluaran.POST("", expenseCtrl.CreateExpense)
+			pengeluaran.PUT("/:id", expenseCtrl.UpdateExpense)
+			pengeluaran.DELETE("/:id", expenseCtrl.DeleteExpense)
+		}
+
+		// PENGATURAN Routes - untuk settings
+		pengaturan := api.Group("/pengaturan", utils.AuthMiddleware(), utils.AdminOnly())
+		{
+			settingsCtrl := &controllers.SettingsController{}
+			pengaturan.GET("", settingsCtrl.GetSettings)
+			pengaturan.PUT("", settingsCtrl.UpdateSettings)
+		}
+
 		productCtrl := &controllers.ProductController{}
 		productRoutes := api.Group("/products")
 		{

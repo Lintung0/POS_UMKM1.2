@@ -54,9 +54,9 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API (uses different base URL - no /api prefix)
+// Auth API (uses standard /api prefix)
 export const authAPI = {
-  login: (credentials) => axios.post('/login', credentials),
+  login: (credentials) => axios.post('/api/login', credentials),
 };
 
 // Products API

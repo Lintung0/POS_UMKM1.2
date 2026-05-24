@@ -23,8 +23,10 @@ type User struct {
 }
 
 func (u *User) BeforeSave(tx *gorm.DB) (err error) {
-	// Hash password if it's being changed
-	if u.Password != "" {
+	// Only hash the password if it is a plain-text value.
+	// bcrypt hashes always start with "$2a$", "$2b$" or "$2y$".
+	// Skipping re-hashing prevents double-hashing on partial updates.
+	if u.Password != "" && len(u.Password) < 60 {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return err
@@ -39,8 +41,8 @@ func (u *User) VerifyPassword(password string) error {
 }
 
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username string `json:"username" form:"username" query:"username" binding:"required"`
+	Password string `json:"password" form:"password" query:"password" binding:"required"`
 }
 
 type userResponse struct {

@@ -6,19 +6,20 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
-# Copy built assets from builder to nginx
-COPY --from=build /app/dist /usr/share/nginx/html
-# Modify default nginx config for SPA routing (optional but recommended for React/Vue/Vite)
-RUN echo 'server { \
-    listen 80; \
-    location / { \
-    root /usr/share/nginx/html; \
-    index index.html index.htm; \
-    try_files $uri $uri/ /index.html; \
-    } \
-    }' > /etc/nginx/conf.d/default.conf
+# Production stage — Caddy (static files only)
+# Reverse proxy to backend is handled by the EXTERNAL Caddy at /home/senvada/hosting/Caddyfile
+FROM caddy:2-alpine
+
+COPY --from=build /app/dist /srv
+
+RUN cat > /etc/caddy/Caddyfile << 'CADDYFILE'
+:80 {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+    encode gzip zstd
+}
+CADDYFILE
 
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

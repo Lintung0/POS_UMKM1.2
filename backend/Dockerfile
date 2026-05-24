@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine
+FROM golang:1.23-alpine
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go application
-RUN go build -o server .
+RUN go mod tidy && go build -o server .
 
 # Expose the API port
 EXPOSE 8081
